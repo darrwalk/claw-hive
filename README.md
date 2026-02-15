@@ -14,6 +14,7 @@ hive-data/              (task storage - outside this repo)
 
 claw-hive/              (this repo)
 ├── cli/                hive-cli tool
+├── dashboard/          Next.js web dashboard
 ├── schema/             Task/project format docs + examples
 └── docs/               Agent protocol documentation
 ```
@@ -65,6 +66,22 @@ Agents use `hive-cli` directly:
 1. On startup: `hive-cli update {task-id} --status in_progress --owner {agent-id}`
 2. During work: `hive-cli update {task-id} --log "progress update"`
 3. On completion: `hive-cli update {task-id} --status completed --output path/to/result.md`
+
+## Dashboard
+
+Read-only web dashboard for task visibility. Reads JSON task files directly — no database.
+
+```bash
+# Start with docker compose
+HIVE_DATA_DIR=/path/to/hive-data docker compose up -d
+
+# Access at http://localhost:4100 (or Tailscale IP)
+```
+
+Features:
+- Overview page with task counts and blocked task alerts
+- Kanban board with 5 status columns
+- Auto-refresh every 15 seconds
 
 ## Configuration
 
