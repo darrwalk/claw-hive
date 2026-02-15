@@ -1,0 +1,37 @@
+{
+  "task_id": "20260215-143022-a7f3",
+  "title": "Research vector database options",
+  "description": "Compare Qdrant, Chroma, and Milvus for local deployment. Focus on: memory footprint, OpenClaw integration complexity, and embedding model compatibility.",
+  "type": "research",
+  "status": "in_progress",
+  "owner": "research-agent",
+  "project_id": "20260215-140000-b1c2",
+  "depends_on": [],
+  "output_path": "research-agent/completed/vector-db-comparison.md",
+  "deadline_minutes": 30,
+  "blocked_on": null,
+  "human_input": null,
+  "created_at": "2026-02-15T14:30:22Z",
+  "claimed_at": "2026-02-15T14:30:45Z",
+  "completed_at": null,
+  "log": [
+    {
+      "ts": "2026-02-15T14:30:22Z",
+      "event": "created",
+      "agent": "hive-cli",
+      "detail": "Task created by main agent via hive-cli"
+    },
+    {
+      "ts": "2026-02-15T14:30:45Z",
+      "event": "claimed",
+      "agent": "research-agent",
+      "detail": "Claimed task, starting research"
+    },
+    {
+      "ts": "2026-02-15T14:42:10Z",
+      "event": "progress",
+      "agent": "research-agent",
+      "detail": "Evaluated Qdrant and Chroma, starting Milvus"
+    }
+  ]
+}

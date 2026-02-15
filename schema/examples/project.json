@@ -1,0 +1,19 @@
+{
+  "project_id": "20260215-140000-b1c2",
+  "title": "Add semantic search to Claudia",
+  "description": "Research, select, and deploy a vector database for semantic search over the vault.",
+  "tasks": [
+    {
+      "task_id": "20260215-143022-a7f3",
+      "title": "Research vector database options",
+      "type": "research"
+    },
+    {
+      "task_id": "20260215-143022-d4e5",
+      "title": "Build vector DB integration prototype",
+      "type": "dev"
+    }
+  ],
+  "created_at": "2026-02-15T14:00:00Z",
+  "status": "active"
+}

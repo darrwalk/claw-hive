@@ -1,0 +1,19 @@
+services:
+  claw-hive-dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ${HIVE_DATA_DIR:-./hive-data}:/app/data/hive:ro
+      - ${WORKSPACE_DIR:-/home/openclaw/workspace}:/app/data/workspace:ro
+    environment:
+      - HIVE_DATA_PATH=/app/data/hive
+      - WORKSPACE_PATH=/app/data/workspace
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

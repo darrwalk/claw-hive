@@ -1,0 +1,13 @@
+{
+  "name": "hive-cli",
+  "version": "0.1.0",
+  "description": "CLI for claw-hive task management",
+  "type": "module",
+  "bin": {
+    "hive-cli": "./hive-cli.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.0",
+    "commander": "^13.1.0"
+  }
+}
