@@ -217,6 +217,12 @@ program
 
     if (opts.status) {
       task.status = opts.status;
+      if (opts.status === 'pending') {
+        task.owner = null;
+        task.claimed_at = null;
+        task.completed_at = null;
+        task.blocked_on = null;
+      }
       if (opts.status === 'in_progress' && !task.claimed_at) {
         task.claimed_at = now();
       }
