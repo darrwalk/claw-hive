@@ -5,8 +5,6 @@ import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 
 import { join, resolve, dirname } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import Database from 'better-sqlite3';
-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // --- Config ---
@@ -15,7 +13,6 @@ const DATA_DIR = resolve(process.env.HIVE_DATA_DIR || join(__dirname, '..', '..'
 const ACTIVE_DIR = join(DATA_DIR, 'active');
 const ARCHIVE_DIR = join(DATA_DIR, 'archive');
 const PROJECTS_DIR = join(DATA_DIR, 'projects');
-const DB_PATH = process.env.HIVE_DB || join(DATA_DIR, 'hive.db');
 
 const DEFAULT_DEADLINES = { research: 30, dev: 0 };
 
@@ -65,48 +62,6 @@ function ensureDirs() {
   }
 }
 
-// --- SQLite ---
-
-function getDb() {
-  const db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS tasks (
-      task_id TEXT PRIMARY KEY,
-      title TEXT,
-      type TEXT,
-      status TEXT,
-      owner TEXT,
-      project_id TEXT,
-      created_at TEXT,
-      claimed_at TEXT,
-      completed_at TEXT,
-      deadline_minutes INTEGER,
-      blocked_on TEXT
-    );
-    CREATE TABLE IF NOT EXISTS projects (
-      project_id TEXT PRIMARY KEY,
-      title TEXT,
-      status TEXT,
-      created_at TEXT
-    );
-    CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
-    CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
-  `);
-  return db;
-}
-
-function indexTask(db, task) {
-  db.prepare(`
-    INSERT OR REPLACE INTO tasks (task_id, title, type, status, owner, project_id, created_at, claimed_at, completed_at, deadline_minutes, blocked_on)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    task.task_id, task.title, task.type, task.status, task.owner,
-    task.project_id, task.created_at, task.claimed_at, task.completed_at,
-    task.deadline_minutes, task.blocked_on
-  );
-}
-
 // --- Commands ---
 
 const program = new Command();
@@ -153,10 +108,6 @@ program
     };
 
     writeTask(task);
-
-    const db = getDb();
-    indexTask(db, task);
-    db.close();
 
     if (opts.json) {
       console.log(JSON.stringify(task, null, 2));
@@ -297,10 +248,6 @@ program
 
     writeTask(task);
 
-    const db = getDb();
-    indexTask(db, task);
-    db.close();
-
     if (opts.json) {
       console.log(JSON.stringify(task, null, 2));
     } else {
@@ -335,10 +282,6 @@ program
     });
 
     writeTask(task);
-
-    const db = getDb();
-    indexTask(db, task);
-    db.close();
 
     if (opts.json) {
       console.log(JSON.stringify(task, null, 2));
@@ -412,15 +355,6 @@ projectCmd
 
     const projectPath = join(PROJECTS_DIR, `project-${projectId}.json`);
     writeFileSync(projectPath, JSON.stringify(project, null, 2) + '\n');
-
-    const db = getDb();
-    for (const entry of taskEntries) {
-      const task = readTask(entry.task_id);
-      indexTask(db, task);
-    }
-    db.prepare('INSERT OR REPLACE INTO projects (project_id, title, status, created_at) VALUES (?, ?, ?, ?)')
-      .run(project.project_id, project.title, project.status, project.created_at);
-    db.close();
 
     if (opts.json) {
       console.log(JSON.stringify(project, null, 2));

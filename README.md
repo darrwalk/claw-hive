@@ -10,8 +10,7 @@ All agents use `hive-cli` to create, claim, update, and complete tasks. JSON tas
 hive-data/              (task storage - outside this repo)
 ├── active/             All live task JSON files
 ├── archive/            Old completed/failed tasks
-├── projects/           Multi-step project definitions
-└── hive.db             SQLite index (updated by CLI)
+└── projects/           Multi-step project definitions
 
 claw-hive/              (this repo)
 ├── cli/                hive-cli tool
@@ -72,7 +71,6 @@ Agents use `hive-cli` directly:
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `HIVE_DATA_DIR` | `../hive-data` (relative to CLI) | Path to task data directory |
-| `HIVE_DB` | `$HIVE_DATA_DIR/hive.db` | Path to SQLite index |
 
 ## License
 
