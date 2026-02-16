@@ -2,6 +2,7 @@
 
 import { Command } from 'commander';
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
+import { canComplete, shouldAutoCompleteParent } from './lib/lifecycle.js';
 import { join, resolve, dirname } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -49,6 +50,12 @@ function writeTask(task) {
   writeFileSync(path, JSON.stringify(task, null, 2) + '\n');
 }
 
+function readTaskSafe(taskId) {
+  const path = join(ACTIVE_DIR, `task-${taskId}.json`);
+  if (!existsSync(path)) return null;
+  return JSON.parse(readFileSync(path, 'utf-8'));
+}
+
 function listTaskFiles(dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
@@ -77,6 +84,7 @@ program
   .option('--project <id>', 'Link to project')
   .option('--depends-on <ids...>', 'Task IDs this depends on')
   .option('--deadline <minutes>', 'Deadline in minutes')
+  .option('--parent-task <id>', 'Parent task ID (for sub-tasks)')
   .option('--meta <key=value...>', 'Set metadata key=value (repeatable)')
   .option('--json', 'Output as JSON')
   .action((opts) => {
@@ -102,6 +110,7 @@ program
       owner: null,
       project_id: opts.project || null,
       depends_on: opts.dependsOn || [],
+      parent_task: opts.parentTask || null,
       output_path: null,
       metadata,
       deadline_minutes: deadline,
@@ -204,6 +213,15 @@ program
       if (task.human_input.provided) console.log(`Provided: ${task.human_input.provided}`);
     }
     if (task.depends_on?.length) console.log(`Depends on: ${task.depends_on.join(', ')}`);
+    if (task.parent_task) console.log(`Parent: ${task.parent_task}`);
+
+    const children = listTaskFiles(ACTIVE_DIR).filter(t => t.parent_task === task.task_id);
+    if (children.length > 0) {
+      console.log(`Children (${children.length}):`);
+      for (const c of children) {
+        console.log(`  ${c.task_id}  [${c.status}] ${c.title}`);
+      }
+    }
 
     if (task.metadata && Object.keys(task.metadata).length > 0) {
       console.log('Metadata:');
@@ -236,6 +254,23 @@ program
     if (!task.metadata) task.metadata = {};
 
     if (opts.status) {
+      // Guard A: block premature parent completion
+      if (opts.status === 'completed') {
+        const allTasks = listTaskFiles(ACTIVE_DIR);
+        const result = canComplete(taskId, allTasks);
+        if (!result.allowed) {
+          task.status = 'in_progress';
+          task.completed_at = null;
+          task.log.push({
+            ts: now(), event: 'guard', agent: 'hive-cli',
+            detail: `Completion blocked: ${result.incomplete}/${result.children} children still incomplete`
+          });
+          writeTask(task);
+          console.log(`Completion blocked: ${result.incomplete} children still incomplete. Task stays in_progress.`);
+          return;
+        }
+      }
+
       task.status = opts.status;
       if (opts.status === 'pending') {
         task.owner = null;
@@ -282,6 +317,25 @@ program
     });
 
     writeTask(task);
+
+    // Guard B: auto-complete parent when last child finishes
+    if (opts.status === 'completed' && task.parent_task) {
+      const allTasks = listTaskFiles(ACTIVE_DIR);
+      const parentId = shouldAutoCompleteParent(task, allTasks);
+      if (parentId) {
+        const parent = readTaskSafe(parentId);
+        if (parent && parent.status === 'in_progress') {
+          parent.status = 'completed';
+          parent.completed_at = now();
+          parent.log.push({
+            ts: now(), event: 'completed', agent: 'hive-cli',
+            detail: `Auto-completed: all ${allTasks.filter(t => t.parent_task === parentId).length} children finished`
+          });
+          writeTask(parent);
+          console.log(`Parent task ${parentId} auto-completed (all children done).`);
+        }
+      }
+    }
 
     if (opts.json) {
       console.log(JSON.stringify(task, null, 2));
