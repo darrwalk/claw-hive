@@ -5,6 +5,7 @@ services:
       - "100.99.29.88:4100:3000"
     volumes:
       - ${HIVE_DATA_DIR:-./hive-data}:/app/data/hive:rw
+      - ./cli:/app/cli:ro
     environment:
       - HIVE_DATA_PATH=/app/data/hive
       - HOSTNAME=0.0.0.0

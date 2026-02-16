@@ -387,14 +387,14 @@ projectCmd
   .description('Create a multi-task project')
   .requiredOption('--title <title>', 'Project title')
   .option('--desc <description>', 'Project description', '')
-  .requiredOption('--tasks <tasks...>', 'Tasks as "type:title" pairs')
+  .option('--tasks <tasks...>', 'Tasks as "type:title" pairs')
   .option('--json', 'Output as JSON')
   .action((opts) => {
     ensureDirs();
     const projectId = generateId();
     const taskEntries = [];
 
-    for (const spec of opts.tasks) {
+    for (const spec of (opts.tasks || [])) {
       const colonIdx = spec.indexOf(':');
       if (colonIdx === -1) {
         console.error(`Invalid task spec: "${spec}". Use "type:title" format.`);
@@ -455,6 +455,35 @@ projectCmd
       for (const t of taskEntries) {
         console.log(`    ${t.task_id}  [${t.type}] ${t.title}`);
       }
+    }
+  });
+
+// project update
+projectCmd
+  .command('update <project-id>')
+  .description('Update a project')
+  .option('--title <title>', 'New project title')
+  .option('--desc <description>', 'New project description')
+  .option('--status <status>', 'New project status')
+  .option('--json', 'Output as JSON')
+  .action((projectId, opts) => {
+    const projectPath = join(PROJECTS_DIR, `project-${projectId}.json`);
+    if (!existsSync(projectPath)) {
+      console.error(`Project not found: ${projectId}`);
+      process.exit(1);
+    }
+    const project = JSON.parse(readFileSync(projectPath, 'utf-8'));
+
+    if (opts.title) project.title = opts.title;
+    if (opts.desc) project.description = opts.desc;
+    if (opts.status) project.status = opts.status;
+
+    writeFileSync(projectPath, JSON.stringify(project, null, 2) + '\n');
+
+    if (opts.json) {
+      console.log(JSON.stringify(project, null, 2));
+    } else {
+      console.log(`Updated project ${projectId}: ${project.title} [${project.status}]`);
     }
   });
 

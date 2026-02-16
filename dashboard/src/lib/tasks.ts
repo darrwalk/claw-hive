@@ -1,4 +1,5 @@
-import { readdir, readFile, writeFile, mkdir } from 'fs/promises'
+import { readdir, readFile } from 'fs/promises'
+import { execFileSync } from 'child_process'
 import { join } from 'path'
 import { Task, Project, groupByStatus, getActivityFeed, getStats, formatDuration } from './types'
 
@@ -6,47 +7,54 @@ export type { Task, Project }
 export { groupByStatus, getActivityFeed, getStats, formatDuration }
 
 const DATA_PATH = process.env.HIVE_DATA_PATH || '/app/data/hive'
+const HIVE_CLI = '/app/cli/hive-cli.js'
 
-export async function getActiveTasks(): Promise<Task[]> {
-  const dir = join(DATA_PATH, 'active')
+function hive(...args: string[]): string {
+  return execFileSync('node', [HIVE_CLI, ...args], {
+    env: { ...process.env, HIVE_DATA_DIR: DATA_PATH },
+    encoding: 'utf-8',
+    timeout: 10000,
+  })
+}
+
+// --- Read functions (direct file access, unchanged) ---
+
+async function readJsonFiles<T>(dir: string): Promise<T[]> {
   try {
     const files = await readdir(dir)
     const jsonFiles = files.filter(f => f.endsWith('.json'))
-    const tasks = await Promise.all(
+    const items = await Promise.all(
       jsonFiles.map(async (f) => {
         const raw = await readFile(join(dir, f), 'utf-8')
-        return JSON.parse(raw) as Task
+        return JSON.parse(raw) as T
       })
     )
-    return tasks.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    return items
   } catch {
     return []
   }
+}
+
+export async function getActiveTasks(): Promise<Task[]> {
+  const tasks = await readJsonFiles<Task>(join(DATA_PATH, 'active'))
+  return tasks.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 }
 
 export async function getArchivedTasks(): Promise<Task[]> {
-  const dir = join(DATA_PATH, 'archive')
-  try {
-    const files = await readdir(dir)
-    const jsonFiles = files.filter(f => f.endsWith('.json'))
-    const tasks = await Promise.all(
-      jsonFiles.map(async (f) => {
-        const raw = await readFile(join(dir, f), 'utf-8')
-        return JSON.parse(raw) as Task
-      })
-    )
-    return tasks.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-  } catch {
-    return []
-  }
+  const tasks = await readJsonFiles<Task>(join(DATA_PATH, 'archive'))
+  return tasks.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 }
 
 export async function getTask(id: string): Promise<Task | null> {
+  // Try both filename conventions: bare id and task-prefixed
+  const candidates = [id, `task-${id}`]
   for (const subdir of ['active', 'archive']) {
-    try {
-      const raw = await readFile(join(DATA_PATH, subdir, `${id}.json`), 'utf-8')
-      return JSON.parse(raw) as Task
-    } catch { /* not found in this dir */ }
+    for (const name of candidates) {
+      try {
+        const raw = await readFile(join(DATA_PATH, subdir, `${name}.json`), 'utf-8')
+        return JSON.parse(raw) as Task
+      } catch { /* not found */ }
+    }
   }
   return null
 }
@@ -69,81 +77,81 @@ export async function getProjects(): Promise<Project[]> {
 }
 
 export async function getProject(id: string): Promise<Project | null> {
-  try {
-    const raw = await readFile(join(DATA_PATH, 'projects', `${id}.json`), 'utf-8')
-    return JSON.parse(raw) as Project
-  } catch {
-    return null
+  const candidates = [id, `project-${id}`]
+  for (const name of candidates) {
+    try {
+      const raw = await readFile(join(DATA_PATH, 'projects', `${name}.json`), 'utf-8')
+      return JSON.parse(raw) as Project
+    } catch { /* not found */ }
   }
+  return null
 }
 
+// --- Write functions (delegate to hive-cli) ---
+
 export async function createTask(data: { title: string; description: string; type: string; project_id?: string }): Promise<Task> {
-  const dir = join(DATA_PATH, 'active')
-  await mkdir(dir, { recursive: true })
-  const id = `task-${Date.now()}`
-  const task: Task = {
-    task_id: id,
-    title: data.title,
-    description: data.description,
-    type: data.type,
-    status: 'pending',
-    owner: null,
-    project_id: data.project_id || null,
-    depends_on: [],
-    output_path: null,
-    deadline_minutes: null,
-    blocked_on: null,
-    human_input: null,
-    created_at: new Date().toISOString(),
-    claimed_at: null,
-    completed_at: null,
-    metadata: {},
-    log: [{ ts: new Date().toISOString(), event: 'created', agent: 'dashboard', detail: 'Task created via dashboard' }],
-  }
-  await writeFile(join(dir, `${id}.json`), JSON.stringify(task, null, 2))
-  return task
+  const args = [
+    'create',
+    '--title', data.title,
+    '--desc', data.description,
+    '--type', data.type || 'research',
+    '--json',
+  ]
+  if (data.project_id) args.push('--project', data.project_id)
+
+  const output = hive(...args)
+  return JSON.parse(output) as Task
 }
 
 export async function updateTask(id: string, updates: Partial<Task>): Promise<Task | null> {
   const task = await getTask(id)
   if (!task) return null
-  const updated = { ...task, ...updates }
-  const subdir = updated.status === 'completed' || updated.status === 'failed' ? 'archive' : 'active'
-  await writeFile(join(DATA_PATH, subdir, `${id}.json`), JSON.stringify(updated, null, 2))
-  return updated
-}
 
-export async function createProject(data: { title: string; description: string }): Promise<Project> {
-  const dir = join(DATA_PATH, 'projects')
-  await mkdir(dir, { recursive: true })
-  const id = `proj-${Date.now()}`
-  const project: Project = {
-    project_id: id,
-    title: data.title,
-    description: data.description,
-    tasks: [],
-    created_at: new Date().toISOString(),
-    status: 'active',
-  }
-  await writeFile(join(dir, `${id}.json`), JSON.stringify(project, null, 2))
-  return project
-}
+  // Use the task_id from the stored task (the canonical ID)
+  const taskId = task.task_id
+  const args = ['update', taskId, '--json']
 
-export async function updateProject(id: string, updates: Partial<Project>): Promise<Project | null> {
-  const project = await getProject(id)
-  if (!project) return null
-  const updated = { ...project, ...updates }
-  await writeFile(join(DATA_PATH, 'projects', `${id}.json`), JSON.stringify(updated, null, 2))
-  return updated
+  if (updates.status) args.push('--status', updates.status)
+  if (updates.owner) args.push('--owner', updates.owner)
+  if (updates.output_path) args.push('--output', updates.output_path)
+  if (updates.blocked_on) args.push('--blocked-on', updates.blocked_on)
+
+  const output = hive(...args)
+  return JSON.parse(output) as Task
 }
 
 export async function provideInput(id: string, input: string): Promise<Task | null> {
   const task = await getTask(id)
   if (!task) return null
-  task.human_input = { needed: task.human_input?.needed || '', provided: input }
-  task.blocked_on = null
-  task.status = 'pending'
-  task.log.push({ ts: new Date().toISOString(), event: 'input_provided', agent: 'dashboard', detail: input })
-  await writeFile(join(DATA_PATH, 'active', `${id}.json`), JSON.stringify(task, null, 2))
-  return task
+
+  const taskId = task.task_id
+  const output = hive('provide', taskId, '--input', input, '--json')
+  return JSON.parse(output) as Task
+}
+
+export async function createProject(data: { title: string; description: string }): Promise<Project> {
+  const args = [
+    'project', 'create',
+    '--title', data.title,
+    '--desc', data.description || '',
+    '--json',
+  ]
+
+  const output = hive(...args)
+  return JSON.parse(output) as Project
+}
+
+export async function updateProject(id: string, updates: Partial<Project>): Promise<Project | null> {
+  const project = await getProject(id)
+  if (!project) return null
+
+  const projectId = project.project_id
+  const args = ['project', 'update', projectId, '--json']
+
+  if (updates.title) args.push('--title', updates.title)
+  if (updates.description) args.push('--desc', updates.description)
+  if (updates.status) args.push('--status', updates.status)
+
+  const output = hive(...args)
+  return JSON.parse(output) as Project
 }
