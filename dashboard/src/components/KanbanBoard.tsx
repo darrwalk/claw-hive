@@ -39,7 +39,7 @@ export default function KanbanBoard({ allTasks, owners, types }: Props) {
 
   const visibleColumns = statusFilter === 'all'
     ? COLUMNS
-    : COLUMNS.filter(c => c.key === statusFilter)
+    : COLUMNS.filter(c => c.key === (statusFilter === 'abandoned' ? 'failed' : statusFilter))
 
   return (
     <div className="space-y-4">
@@ -62,6 +62,7 @@ export default function KanbanBoard({ allTasks, owners, types }: Props) {
             <SelectItem value="blocked">Blocked</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>
             <SelectItem value="failed">Failed</SelectItem>
+            <SelectItem value="abandoned">Abandoned</SelectItem>
           </SelectContent>
         </Select>
         {owners.length > 0 && (

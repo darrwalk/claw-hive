@@ -50,7 +50,7 @@ export default function TaskActions({ task }: { task: Task }) {
         <CardTitle className="text-base">Actions</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {(task.status === 'completed' || task.status === 'failed') && (
+        {(task.status === 'completed' || task.status === 'failed' || task.status === 'abandoned') && (
           <Button
             size="sm"
             variant="outline"
@@ -58,6 +58,18 @@ export default function TaskActions({ task }: { task: Task }) {
             onClick={() => handleUpdate({ status: 'pending' })}
           >
             Redo
+          </Button>
+        )}
+
+        {task.status === 'blocked' && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={loading}
+            className="text-zinc-400 border-zinc-700 hover:bg-zinc-900"
+            onClick={() => handleUpdate({ status: 'abandoned' })}
+          >
+            Abandon
           </Button>
         )}
 

@@ -171,6 +171,7 @@ program
       completed: '\x1b[32m',
       failed: '\x1b[31m',
       blocked: '\x1b[35m',
+      abandoned: '\x1b[90m',
     };
     const reset = '\x1b[0m';
 
@@ -281,7 +282,7 @@ program
       if (opts.status === 'in_progress' && !task.claimed_at) {
         task.claimed_at = now();
       }
-      if (opts.status === 'completed' || opts.status === 'failed') {
+      if (opts.status === 'completed' || opts.status === 'failed' || opts.status === 'abandoned') {
         task.completed_at = now();
       }
       if (opts.status === 'blocked' && opts.blockedOn) {
@@ -494,7 +495,7 @@ program
   .action(() => {
     const tasks = listTaskFiles(ACTIVE_DIR);
 
-    const counts = { pending: 0, in_progress: 0, blocked: 0, completed: 0, failed: 0 };
+    const counts = { pending: 0, in_progress: 0, blocked: 0, completed: 0, failed: 0, abandoned: 0 };
     for (const t of tasks) {
       counts[t.status] = (counts[t.status] || 0) + 1;
     }
@@ -508,6 +509,7 @@ program
     console.log(`  ║  Blocked:      ${String(counts.blocked).padStart(3)}              ║`);
     console.log(`  ║  Completed:    ${String(counts.completed).padStart(3)}              ║`);
     console.log(`  ║  Failed:       ${String(counts.failed).padStart(3)}              ║`);
+    console.log(`  ║  Abandoned:    ${String(counts.abandoned).padStart(3)}              ║`);
     console.log('  ╠══════════════════════════════════╣');
     console.log(`  ║  Total:        ${String(total).padStart(3)}              ║`);
     console.log('  ╚══════════════════════════════════╝\n');

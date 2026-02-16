@@ -15,7 +15,7 @@ export interface Task {
   title: string
   description: string
   type: string
-  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked'
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'blocked' | 'abandoned'
   owner: string | null
   project_id: string | null
   depends_on: string[]
@@ -50,7 +50,7 @@ export function groupByStatus(tasks: Task[]): Record<string, Task[]> {
     failed: [],
   }
   for (const task of tasks) {
-    const key = task.status in groups ? task.status : 'pending'
+    const key = task.status === 'abandoned' ? 'failed' : (task.status in groups ? task.status : 'pending')
     groups[key].push(task)
   }
   return groups

@@ -16,6 +16,7 @@ const EVENT_COLORS: Record<string, string> = {
   unblocked: 'bg-yellow-950 text-yellow-400',
   update: 'bg-secondary text-muted-foreground',
   timeout: 'bg-red-950 text-red-400',
+  abandoned: 'bg-zinc-950 text-zinc-400',
 }
 
 export default async function ActivityPage() {

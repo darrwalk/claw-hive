@@ -19,6 +19,7 @@ const STATUS_BADGES: Record<string, string> = {
   blocked: 'bg-orange-950 text-orange-400 border-orange-800',
   completed: 'bg-green-950 text-green-400 border-green-800',
   failed: 'bg-red-950 text-red-400 border-red-800',
+  abandoned: 'bg-zinc-950 text-zinc-400 border-zinc-800',
 }
 
 interface Props {
@@ -114,7 +115,7 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
 
           {/* Actions */}
           <div className="space-y-3">
-            {(task.status === 'completed' || task.status === 'failed') && (
+            {(task.status === 'completed' || task.status === 'failed' || task.status === 'abandoned') && (
               <Button
                 size="sm"
                 variant="outline"
@@ -122,6 +123,18 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
                 onClick={() => handleUpdate({ status: 'pending' })}
               >
                 Redo
+              </Button>
+            )}
+
+            {task.status === 'blocked' && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={loading}
+                className="text-zinc-400 border-zinc-700 hover:bg-zinc-900"
+                onClick={() => handleUpdate({ status: 'abandoned' })}
+              >
+                Abandon
               </Button>
             )}
 

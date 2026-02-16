@@ -14,6 +14,7 @@ const STATUS_BADGES: Record<string, string> = {
   blocked: 'bg-orange-950 text-orange-400 border-orange-800',
   completed: 'bg-green-950 text-green-400 border-green-800',
   failed: 'bg-red-950 text-red-400 border-red-800',
+  abandoned: 'bg-zinc-950 text-zinc-400 border-zinc-800',
 }
 
 export default async function TaskDetailPage({ params }: { params: { id: string } }) {
