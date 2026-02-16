@@ -23,6 +23,7 @@ export default function CreateTaskDialog({ open, onOpenChange, defaultProjectId 
   const [type, setType] = useState('research')
   const [projectId, setProjectId] = useState(defaultProjectId || '')
   const [projects, setProjects] = useState<{ project_id: string; title: string }[]>([])
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (open) {
@@ -33,8 +34,9 @@ export default function CreateTaskDialog({ open, onOpenChange, defaultProjectId 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
+    setError('')
     try {
-      await fetch('/api/tasks', {
+      const res = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -44,12 +46,19 @@ export default function CreateTaskDialog({ open, onOpenChange, defaultProjectId 
           project_id: projectId || undefined,
         }),
       })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        setError(body.error || `Failed to create task (${res.status})`)
+        return
+      }
       setTitle('')
       setDescription('')
       setType('research')
       setProjectId('')
       onOpenChange(false)
       router.refresh()
+    } catch {
+      setError('Network error — could not reach the server')
     } finally {
       setLoading(false)
     }
@@ -97,6 +106,7 @@ export default function CreateTaskDialog({ open, onOpenChange, defaultProjectId 
               </Select>
             </div>
           </div>
+          {error && <p className="text-sm text-red-500">{error}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit" disabled={loading || !title || !description}>
