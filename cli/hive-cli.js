@@ -77,11 +77,21 @@ program
   .option('--project <id>', 'Link to project')
   .option('--depends-on <ids...>', 'Task IDs this depends on')
   .option('--deadline <minutes>', 'Deadline in minutes')
+  .option('--meta <key=value...>', 'Set metadata key=value (repeatable)')
   .option('--json', 'Output as JSON')
   .action((opts) => {
     ensureDirs();
     const taskId = generateId();
     const deadline = opts.deadline != null ? parseInt(opts.deadline) : (DEFAULT_DEADLINES[opts.type] ?? 0);
+
+    const metadata = {};
+    if (opts.meta) {
+      for (const pair of opts.meta) {
+        const eq = pair.indexOf('=');
+        if (eq === -1) { console.error(`Invalid --meta format: "${pair}". Use key=value.`); process.exit(1); }
+        metadata[pair.slice(0, eq)] = pair.slice(eq + 1);
+      }
+    }
 
     const task = {
       task_id: taskId,
@@ -93,6 +103,7 @@ program
       project_id: opts.project || null,
       depends_on: opts.dependsOn || [],
       output_path: null,
+      metadata,
       deadline_minutes: deadline,
       blocked_on: null,
       human_input: null,
@@ -194,6 +205,13 @@ program
     }
     if (task.depends_on?.length) console.log(`Depends on: ${task.depends_on.join(', ')}`);
 
+    if (task.metadata && Object.keys(task.metadata).length > 0) {
+      console.log('Metadata:');
+      for (const [k, v] of Object.entries(task.metadata)) {
+        console.log(`  ${k}: ${v}`);
+      }
+    }
+
     console.log(`\nLog (${task.log.length} entries):`);
     for (const entry of task.log.slice(-10)) {
       const agent = entry.agent ? ` [${entry.agent}]` : '';
@@ -210,10 +228,12 @@ program
   .option('--output <path>', 'Set output path')
   .option('--blocked-on <target>', 'Set blocked_on (human or task-{id})')
   .option('--needs <description>', 'Set human_input.needed')
+  .option('--meta <key=value...>', 'Set metadata key=value (repeatable, empty value deletes key)')
   .option('--log <message>', 'Append log entry')
   .option('--json', 'Output as JSON')
   .action((taskId, opts) => {
     const task = readTask(taskId);
+    if (!task.metadata) task.metadata = {};
 
     if (opts.status) {
       task.status = opts.status;
@@ -241,6 +261,15 @@ program
     if (opts.blockedOn) task.blocked_on = opts.blockedOn;
     if (opts.needs) {
       task.human_input = { needed: opts.needs, provided: null };
+    }
+    if (opts.meta) {
+      for (const pair of opts.meta) {
+        const eq = pair.indexOf('=');
+        if (eq === -1) { console.error(`Invalid --meta format: "${pair}". Use key=value.`); process.exit(1); }
+        const key = pair.slice(0, eq);
+        const value = pair.slice(eq + 1);
+        if (value === '') { delete task.metadata[key]; } else { task.metadata[key] = value; }
+      }
     }
 
     const logEvent = opts.status || 'update';
@@ -332,6 +361,7 @@ projectCmd
         project_id: projectId,
         depends_on: taskEntries.length > 0 ? [taskEntries[taskEntries.length - 1].task_id] : [],
         output_path: null,
+        metadata: {},
         deadline_minutes: deadline,
         blocked_on: null,
         human_input: null,
