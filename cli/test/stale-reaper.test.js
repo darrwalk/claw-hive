@@ -9,6 +9,7 @@ const task = (overrides) => ({
   status: 'pending',
   claimed_at: null,
   deadline_minutes: 0,
+  log: [],
   ...overrides,
 });
 
@@ -67,5 +68,35 @@ describe('findStaleTasks', () => {
 
   it('returns empty array for empty input', () => {
     assert.deepEqual(findStaleTasks([], 60), []);
+  });
+
+  it('skips task with recent log entry even if claimed_at is old', () => {
+    const tasks = [task({
+      status: 'in_progress',
+      claimed_at: minutesAgo(90),
+      log: [{ ts: minutesAgo(10), msg: 'heartbeat: polling' }],
+    })];
+    const stale = findStaleTasks(tasks, 60);
+    assert.equal(stale.length, 0);
+  });
+
+  it('flags task with old log entry as stale', () => {
+    const tasks = [task({
+      status: 'in_progress',
+      claimed_at: minutesAgo(90),
+      log: [{ ts: minutesAgo(90), msg: 'started work' }],
+    })];
+    const stale = findStaleTasks(tasks, 60);
+    assert.equal(stale.length, 1);
+  });
+
+  it('flags task with empty log array as stale (falls back to claimed_at)', () => {
+    const tasks = [task({
+      status: 'in_progress',
+      claimed_at: minutesAgo(90),
+      log: [],
+    })];
+    const stale = findStaleTasks(tasks, 60);
+    assert.equal(stale.length, 1);
   });
 });
