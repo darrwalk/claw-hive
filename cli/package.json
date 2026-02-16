@@ -6,6 +6,9 @@
   "bin": {
     "hive-cli": "./hive-cli.js"
   },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
   "dependencies": {
     "commander": "^13.1.0"
   }
