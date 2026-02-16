@@ -301,7 +301,11 @@ program
       }
     }
     if (opts.owner) task.owner = opts.owner;
-    if (opts.output) task.output_path = opts.output;
+    if (opts.output) {
+      task.output_path = opts.output;
+      const sidecar = join(ACTIVE_DIR, `task-${id}.output.md`);
+      writeFileSync(sidecar, opts.output);
+    }
     if (opts.blockedOn) task.blocked_on = opts.blockedOn;
     if (opts.needs) {
       task.human_input = { needed: opts.needs, provided: null };

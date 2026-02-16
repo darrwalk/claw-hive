@@ -5,6 +5,7 @@ import { Separator } from '@/components/ui/separator'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import TaskActions from '@/components/TaskActions'
+import TaskOutput from '@/components/TaskOutput'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,6 +56,8 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
           <p className="text-sm text-muted-foreground whitespace-pre-wrap">{task.description}</p>
         </CardContent>
       </Card>
+
+      <TaskOutput taskId={task.task_id} />
 
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div>

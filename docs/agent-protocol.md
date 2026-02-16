@@ -23,8 +23,10 @@ hive-cli update {id} --log "description of progress"
 
 ### On Completion
 ```bash
-hive-cli update {id} --status completed --output path/to/result.md --log "summary of results"
+hive-cli update {id} --status completed --output "Your result summary here" --log "summary of results"
 ```
+
+The `--output` text is stored as a sidecar file alongside the task and rendered in the dashboard.
 
 ### On Failure
 ```bash
@@ -46,6 +48,9 @@ hive-cli summary
 
 ### If No TASK_ID
 If the message does NOT contain `TASK_ID:`, proceed normally without task tracking.
+
+### Human Input
+See the "Human Input" section in the hive skill. With TASK_ID, use hive-cli blocking. Without TASK_ID, ask conversationally.
 ```
 
 ## Main Agent (Task Creator)
