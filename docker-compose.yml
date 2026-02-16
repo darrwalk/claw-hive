@@ -6,8 +6,10 @@ services:
     volumes:
       - ${HIVE_DATA_DIR:-./hive-data}:/app/data/hive:rw
       - ./cli:/app/cli:ro
+      - ${WORKSPACE_DIR:-/home/openclaw/workspace}:/app/workspace:ro
     environment:
       - HIVE_DATA_PATH=/app/data/hive
+      - WORKSPACE_PATH=/app/workspace
       - HOSTNAME=0.0.0.0
     restart: unless-stopped
     healthcheck:
