@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import FileTree from './FileTree'
 import FilePreview from './FilePreview'
+import DirectoryContents from './DirectoryContents'
 import type { Favorite } from '@/lib/workspace'
 
 interface WorkspaceBrowserProps {
@@ -10,7 +11,8 @@ interface WorkspaceBrowserProps {
 }
 
 export default function WorkspaceBrowser({ agents }: WorkspaceBrowserProps) {
-  const [selectedPath, setSelectedPath] = useState<string | null>(null)
+  const [selectedDir, setSelectedDir] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [favorites, setFavorites] = useState<Favorite[]>([])
 
   useEffect(() => {
@@ -29,22 +31,46 @@ export default function WorkspaceBrowser({ agents }: WorkspaceBrowserProps) {
     if (res.ok) setFavorites(await res.json())
   }, [favorites])
 
+  const handleSelectDir = useCallback((path: string) => {
+    setSelectedDir(path)
+    setSelectedFile(null)
+  }, [])
+
+  const handleSelectFile = useCallback((path: string) => {
+    setSelectedFile(path)
+  }, [])
+
+  const handleBackToDir = useCallback(() => {
+    setSelectedFile(null)
+  }, [])
+
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-8rem)] border rounded-lg overflow-hidden bg-card">
       <div className="w-full md:w-72 shrink-0 overflow-hidden">
         <FileTree
           agents={agents}
           favorites={favorites}
-          selectedPath={selectedPath}
-          onSelect={setSelectedPath}
+          selectedDir={selectedDir}
+          onSelectDir={handleSelectDir}
           onToggleFavorite={toggleFavorite}
         />
       </div>
-      <FilePreview
-        path={selectedPath}
-        favorites={favorites}
-        onToggleFavorite={toggleFavorite}
-      />
+      {selectedFile ? (
+        <FilePreview
+          path={selectedFile}
+          favorites={favorites}
+          onToggleFavorite={toggleFavorite}
+          onBack={handleBackToDir}
+        />
+      ) : (
+        <DirectoryContents
+          path={selectedDir}
+          favorites={favorites}
+          onNavigateDir={handleSelectDir}
+          onSelectFile={handleSelectFile}
+          onToggleFavorite={toggleFavorite}
+        />
+      )}
     </div>
   )
 }

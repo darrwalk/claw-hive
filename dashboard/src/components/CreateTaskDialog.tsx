@@ -20,7 +20,7 @@ export default function CreateTaskDialog({ open, onOpenChange, defaultProjectId 
   const [loading, setLoading] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [type, setType] = useState('research')
+  const [type, setType] = useState('ops')
   const [projectId, setProjectId] = useState(defaultProjectId || '')
   const [projects, setProjects] = useState<{ project_id: string; title: string }[]>([])
   const [error, setError] = useState('')
@@ -53,7 +53,7 @@ export default function CreateTaskDialog({ open, onOpenChange, defaultProjectId 
       }
       setTitle('')
       setDescription('')
-      setType('research')
+      setType('ops')
       setProjectId('')
       onOpenChange(false)
       router.refresh()

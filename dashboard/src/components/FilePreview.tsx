@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Star, Download, FileText, ChevronRight } from 'lucide-react'
+import { Star, Download, FileText, ChevronRight, ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Favorite } from '@/lib/workspace'
 
@@ -96,6 +96,7 @@ interface FilePreviewProps {
   path: string | null
   favorites: Favorite[]
   onToggleFavorite: (path: string) => void
+  onBack?: () => void
 }
 
 function formatSize(bytes: number): string {
@@ -104,7 +105,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export default function FilePreview({ path, favorites, onToggleFavorite }: FilePreviewProps) {
+export default function FilePreview({ path, favorites, onToggleFavorite, onBack }: FilePreviewProps) {
   const [content, setContent] = useState<string | null>(null)
   const [mimeType, setMimeType] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -157,6 +158,15 @@ export default function FilePreview({ path, favorites, onToggleFavorite }: FileP
     <div className="flex-1 flex flex-col min-w-0">
       {/* Header */}
       <div className="border-b px-4 py-2 flex items-center gap-2">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="p-1 rounded-md hover:bg-secondary transition-colors text-muted-foreground"
+            title="Back to directory"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+        )}
         <div className="flex items-center gap-1 text-xs text-muted-foreground flex-1 min-w-0">
           {segments.map((seg, i) => (
             <span key={i} className="flex items-center gap-1">
