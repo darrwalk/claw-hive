@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
 import { canComplete, shouldAutoCompleteParent } from './lib/lifecycle.js';
+import { findStaleTasks } from './lib/stale-reaper.js';
 import { join, resolve, dirname } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -542,6 +543,50 @@ program
         console.log(`    ${t.task_id}  ${t.title} [${t.owner || '?'}] (${duration})`);
       }
       console.log();
+    }
+  });
+
+// reap
+program
+  .command('reap')
+  .description('Reset stale in_progress tasks that exceeded their deadline')
+  .option('--threshold <minutes>', 'Minutes before a task is considered stale', '60')
+  .option('--dry-run', 'List stale tasks without modifying them')
+  .action((opts) => {
+    const tasks = listTaskFiles(ACTIVE_DIR);
+    const threshold = parseInt(opts.threshold);
+    const stale = findStaleTasks(tasks, threshold);
+
+    if (stale.length === 0) {
+      console.log('No stale tasks found.');
+      return;
+    }
+
+    for (const t of stale) {
+      const age = Math.round((Date.now() - new Date(t.claimed_at).getTime()) / 60000);
+
+      if (opts.dryRun) {
+        console.log(`[dry-run] ${t.task_id}  ${t.title}  (${age}min, owner: ${t.owner || '?'})`);
+        continue;
+      }
+
+      t.status = 'pending';
+      const prevOwner = t.owner;
+      t.owner = null;
+      t.claimed_at = null;
+      t.blocked_on = null;
+      t.log.push({
+        ts: now(),
+        event: 'timeout',
+        agent: 'reaper',
+        detail: `Stale after ${age}min. Previous owner: ${prevOwner || 'unknown'}`
+      });
+      writeTask(t);
+      console.log(`Reaped ${t.task_id}  ${t.title}  (${age}min, was: ${prevOwner || '?'})`);
+    }
+
+    if (!opts.dryRun) {
+      console.log(`\nReset ${stale.length} stale task(s) to pending.`);
     }
   });
 
