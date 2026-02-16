@@ -19,6 +19,10 @@ const DEFAULT_DEADLINES = { research: 30, dev: 0 };
 
 // --- Helpers ---
 
+function normalizeTaskId(taskId) {
+  return taskId.startsWith('task-') ? taskId.slice(5) : taskId;
+}
+
 function generateId() {
   const now = new Date();
   const pad = (n, len = 2) => String(n).padStart(len, '0');
@@ -33,9 +37,10 @@ function now() {
 }
 
 function readTask(taskId) {
-  const path = join(ACTIVE_DIR, `task-${taskId}.json`);
+  const id = normalizeTaskId(taskId);
+  const path = join(ACTIVE_DIR, `task-${id}.json`);
   if (!existsSync(path)) {
-    const archivePath = join(ARCHIVE_DIR, `task-${taskId}.json`);
+    const archivePath = join(ARCHIVE_DIR, `task-${id}.json`);
     if (existsSync(archivePath)) {
       return JSON.parse(readFileSync(archivePath, 'utf-8'));
     }
@@ -46,12 +51,14 @@ function readTask(taskId) {
 }
 
 function writeTask(task) {
-  const path = join(ACTIVE_DIR, `task-${task.task_id}.json`);
+  const id = normalizeTaskId(task.task_id);
+  const path = join(ACTIVE_DIR, `task-${id}.json`);
   writeFileSync(path, JSON.stringify(task, null, 2) + '\n');
 }
 
 function readTaskSafe(taskId) {
-  const path = join(ACTIVE_DIR, `task-${taskId}.json`);
+  const id = normalizeTaskId(taskId);
+  const path = join(ACTIVE_DIR, `task-${id}.json`);
   if (!existsSync(path)) return null;
   return JSON.parse(readFileSync(path, 'utf-8'));
 }
