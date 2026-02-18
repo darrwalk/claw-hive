@@ -97,6 +97,31 @@ program
   .option('--json', 'Output as JSON')
   .action((opts) => {
     ensureDirs();
+
+    // --- Type routing guard ---
+    // Reject --type ops when keywords clearly indicate research or dev work.
+    // The agent must choose the correct type; the CLI won't auto-correct.
+    if (opts.type === 'ops') {
+      const text = (opts.title + ' ' + opts.desc).toLowerCase();
+      const researchKeywords = ['research', 'investigate', 'analyze', 'look into', 'deep dive', 'compare options', 'find alternatives', 'what are the best', 'evaluate', 'survey'];
+      const devKeywords = ['fix bug', 'add feature', 'refactor', 'write code', 'implement', 'build a', 'test the', 'debug', 'create a script', 'write a'];
+      const matchedResearch = researchKeywords.filter(k => text.includes(k));
+      const matchedDev = devKeywords.filter(k => text.includes(k));
+
+      if (matchedResearch.length > 0) {
+        console.error(`ERROR: Task looks like research (matched: ${matchedResearch.join(', ')}) but --type is "ops".`);
+        console.error('Use: --type research');
+        console.error('See skills/hive/SKILL.md "Task Routing" for type selection rules.');
+        process.exit(1);
+      }
+      if (matchedDev.length > 0) {
+        console.error(`ERROR: Task looks like dev work (matched: ${matchedDev.join(', ')}) but --type is "ops".`);
+        console.error('Use: --type dev');
+        console.error('See skills/hive/SKILL.md "Task Routing" for type selection rules.');
+        process.exit(1);
+      }
+    }
+
     const taskId = generateId();
     const deadline = opts.deadline != null ? parseInt(opts.deadline) : (DEFAULT_DEADLINES[opts.type] ?? 0);
 
