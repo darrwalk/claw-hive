@@ -34,6 +34,9 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
   const [humanInput, setHumanInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [projectTitle, setProjectTitle] = useState<string | null>(null)
+  const [depTasks, setDepTasks] = useState<Task[]>([])
+  const [depMissing, setDepMissing] = useState<string[]>([])
+  const [depsLoading, setDepsLoading] = useState(false)
 
   useEffect(() => {
     if (open && task.project_id) {
@@ -42,6 +45,25 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
       }).catch(() => setProjectTitle(null))
     }
   }, [open, task.project_id])
+
+  useEffect(() => {
+    if (!open || task.depends_on.length === 0) {
+      setDepTasks([])
+      setDepMissing([])
+      return
+    }
+    setDepsLoading(true)
+    Promise.all(
+      task.depends_on.map(id =>
+        fetch(`/api/tasks/${id}`)
+          .then(async r => r.ok ? { id, task: await r.json() as Task } : { id, task: null as Task | null })
+          .catch(() => ({ id, task: null }))
+      )
+    ).then(results => {
+      setDepTasks(results.filter(r => r.task !== null).map(r => r.task as Task))
+      setDepMissing(results.filter(r => r.task === null).map(r => r.id))
+    }).finally(() => setDepsLoading(false))
+  }, [open, task.task_id, task.depends_on])
 
   async function handleUpdate(body: Record<string, string>) {
     setLoading(true)
@@ -103,11 +125,36 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
           <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">{task.description}</p>
 
           {task.depends_on.length > 0 && (
-            <div className="text-sm">
-              <span className="text-muted-foreground">Depends on: </span>
-              {task.depends_on.map(d => (
-                <span key={d} className="font-mono text-xs mr-2">{d}</span>
-              ))}
+            <div className="space-y-2">
+              <span className="text-xs font-medium text-muted-foreground">Dependencies</span>
+              {depsLoading ? (
+                <div className="text-xs text-muted-foreground">Loading dependencies...</div>
+              ) : (
+                <div className="space-y-1">
+                  {depTasks.map(dep => (
+                    <div key={dep.task_id} className="flex items-center justify-between rounded-md bg-secondary p-2">
+                      <Link
+                        href={`/tasks/${dep.task_id}`}
+                        className="text-sm hover:text-primary flex-1 truncate"
+                        onClick={() => onOpenChange(false)}
+                      >
+                        {dep.title}
+                      </Link>
+                      <Badge className={STATUS_BADGES[dep.status]} variant="outline">
+                        {dep.status.replace('_', ' ')}
+                      </Badge>
+                    </div>
+                  ))}
+                  {depMissing.map(id => (
+                    <div key={id} className="flex items-center justify-between rounded-md bg-secondary p-2">
+                      <span className="text-sm font-mono text-muted-foreground flex-1 truncate">{id}</span>
+                      <Badge variant="outline" className="bg-zinc-950 text-zinc-400 border-zinc-800">
+                        archived
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
