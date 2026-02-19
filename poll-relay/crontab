@@ -1,0 +1,5 @@
+* * * * * /app/hive-poll.sh research research 1800
+* * * * * /app/hive-poll.sh dev dev 3600
+* * * * * /app/hive-poll.sh ops main 1800
+*/15 * * * * /app/hive-relay.sh
+*/5 * * * * /app/hive-blocked-relay.sh
