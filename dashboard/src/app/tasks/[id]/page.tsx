@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import TaskActions from '@/components/TaskActions'
 import TaskOutput from '@/components/TaskOutput'
+import ExecutionTimeline from '@/components/ExecutionTimeline'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,6 +59,17 @@ export default async function TaskDetailPage({ params }: { params: { id: string 
       </Card>
 
       <TaskOutput taskId={task.task_id} />
+
+      {task.log.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Execution Timeline</CardTitle>
+          </CardHeader>
+          <CardContent className="px-4">
+            <ExecutionTimeline log={task.log} />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div>
