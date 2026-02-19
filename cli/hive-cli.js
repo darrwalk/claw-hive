@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 
 import { canComplete, shouldAutoCompleteParent, validateDepth } from './lib/lifecycle.js';
 import { findStaleTasks } from './lib/stale-reaper.js';
 import { findStrandedTasks } from './lib/resolve-waiting.js';
+import { pollUntilSettled } from './lib/poll-wait.js';
 import { join, resolve, dirname } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -644,6 +645,35 @@ program
     if (!opts.dryRun) {
       console.log(`\nResolved ${stranded.length} stranded task(s).`);
     }
+  });
+
+// wait
+program
+  .command('wait <task-id>')
+  .description('Block until a task completes or fails')
+  .option('--timeout <seconds>', 'Max wait time in seconds (0 = unlimited)', '0')
+  .option('--interval <seconds>', 'Starting poll interval in seconds', '5')
+  .option('--max-interval <seconds>', 'Max backoff interval in seconds', '30')
+  .action(async (taskId, opts) => {
+    const timeout = parseInt(opts.timeout);
+    const startInterval = parseInt(opts.interval);
+    const maxInterval = parseInt(opts.maxInterval);
+    const deadline = timeout > 0 ? Date.now() + timeout * 1000 : Infinity;
+
+    const readTaskFn = (id) => {
+      try { return readTask(id); } catch { return null; }
+    };
+
+    const { status, exitCode } = await pollUntilSettled(readTaskFn, taskId, { deadline, startInterval, maxInterval });
+
+    if (status === 'timeout') {
+      console.error(`Task ${taskId} timed out after ${timeout}s.`);
+    } else if (exitCode === 0) {
+      console.log(`Task ${taskId} completed.`);
+    } else {
+      console.error(`Task ${taskId} ${status}.`);
+    }
+    process.exit(exitCode);
   });
 
 await program.parseAsync();
