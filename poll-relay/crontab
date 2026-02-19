@@ -3,3 +3,4 @@
 * * * * * /app/hive-poll.sh ops main 1800
 */15 * * * * /app/hive-relay.sh
 */5 * * * * /app/hive-blocked-relay.sh
+*/10 * * * * HIVE_DATA_DIR=$HIVE_DATA_DIR node $HIVE_CLI resolve-waiting

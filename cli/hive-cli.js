@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
 import { canComplete, shouldAutoCompleteParent, validateDepth } from './lib/lifecycle.js';
 import { findStaleTasks } from './lib/stale-reaper.js';
+import { findStrandedTasks } from './lib/resolve-waiting.js';
 import { join, resolve, dirname } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -603,4 +604,46 @@ program
     }
   });
 
-program.parse();
+// resolve-waiting
+program
+  .command('resolve-waiting')
+  .description('Fail pending tasks whose dependencies have failed')
+  .option('--dry-run', 'List stranded tasks without modifying them')
+  .action((opts) => {
+    const tasks = listTaskFiles(ACTIVE_DIR);
+    const stranded = findStrandedTasks(tasks);
+
+    if (stranded.length === 0) {
+      console.log('No stranded tasks found.');
+      return;
+    }
+
+    for (const t of stranded) {
+      const failedDeps = t.depends_on.filter(depId => {
+        const dep = tasks.find(d => d.task_id === depId);
+        return dep && (dep.status === 'failed' || dep.status === 'abandoned');
+      });
+
+      if (opts.dryRun) {
+        console.log(`[dry-run] ${t.task_id}  ${t.title}  (stranded by: ${failedDeps.join(', ')})`);
+        continue;
+      }
+
+      t.status = 'failed';
+      t.completed_at = now();
+      t.log.push({
+        ts: now(),
+        event: 'failed',
+        agent: 'hive-cli',
+        detail: `Stranded: dependency failed (${failedDeps.join(', ')})`
+      });
+      writeTask(t);
+      console.log(`Resolved ${t.task_id}  ${t.title}  (stranded by: ${failedDeps.join(', ')})`);
+    }
+
+    if (!opts.dryRun) {
+      console.log(`\nResolved ${stranded.length} stranded task(s).`);
+    }
+  });
+
+await program.parseAsync();
