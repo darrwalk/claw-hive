@@ -125,6 +125,58 @@ The CLI enforces parent task lifecycle automatically:
 
 The poll system will hold dependent tasks until their dependencies complete.
 
+## Autonomous Task Chaining (Depth-Aware)
+
+Agents running inside a hive task (depth 0) may create sub-tasks and wait for their results — without human handoffs. This section documents the complete protocol.
+
+### Rules
+
+- Only depth-0 agents (tasks created by a human) may create sub-tasks
+- Pass `--depth 1` when creating a sub-task from inside a running task
+- The CLI rejects `--depth 2` or higher — sub-tasks cannot create further sub-tasks
+- If a sub-task's dependency fails, the `resolve-waiting` cron will automatically fail the waiting task
+
+### Creating and Waiting for a Sub-Task
+
+```bash
+DEP_ID=$(hive-cli create \
+  --type research \
+  --title "Investigate X" \
+  --desc "..." \
+  --depth 1 \
+  --json | jq -r '.task_id')
+
+hive-cli wait "$DEP_ID" --timeout 1800
+EXIT=$?
+
+if [ $EXIT -eq 0 ]; then
+  hive-cli update "$MY_TASK_ID" --status completed --log "Research done"
+else
+  hive-cli update "$MY_TASK_ID" --status failed --log "Sub-task failed: $DEP_ID"
+fi
+```
+
+### Wait Command Reference
+
+`hive-cli wait <task-id>` — blocks until the task reaches a terminal state (completed, failed, or abandoned)
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--timeout <seconds>` | 0 (unlimited) | Max wait time; exits 1 if exceeded |
+| `--interval <seconds>` | 5 | Starting poll interval (doubles each tick) |
+| `--max-interval <seconds>` | 30 | Maximum backoff interval |
+
+**Exit codes:**
+- `0` — task completed successfully
+- `1` — task failed, abandoned, or timed out
+
+### Anti-Patterns
+
+- **NEVER** call `hive-cli create` without `--depth 1` from inside a task — this creates a depth-0 task, bypassing the sub-task intent
+- **NEVER** ignore the exit code of `hive-cli wait` — a failed sub-task must propagate failure up the chain
+- **NEVER** create sub-tasks from a depth-1 agent — the CLI enforces this with a hard rejection
+- **NEVER** use `hive-cli wait` on a task type that has no agent polling for it — the wait will time out
+
 ## Human Input — Channel-Aware Behavior
 
 How you ask for human input depends on whether you are in kanban mode or conversational mode.

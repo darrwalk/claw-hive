@@ -109,3 +109,19 @@ CREATE TABLE projects (
 CREATE INDEX idx_tasks_status ON tasks(status);
 CREATE INDEX idx_tasks_project ON tasks(project_id);
 ```
+
+## Automated Maintenance (Cron)
+
+The poll-relay container runs two cron jobs via supercronic:
+
+| Schedule | Command | Purpose |
+|----------|---------|---------|
+| Every 10 min | `resolve-waiting` | Fails pending tasks whose `depends_on` includes a failed or abandoned task |
+| Configurable | `stale-reaper` | Resets in-progress tasks that have exceeded their deadline without heartbeat |
+
+### resolve-waiting
+
+`hive-cli resolve-waiting` scans all pending tasks and checks their `depends_on` list. If any dependency task has status `failed` or `abandoned`, the pending task is immediately set to `failed`.
+
+Options:
+- `--dry-run` — list stranded tasks without modifying any task files
