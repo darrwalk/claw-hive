@@ -8,10 +8,11 @@ import type { Favorite } from '@/lib/workspace'
 
 interface WorkspaceBrowserProps {
   agents: string[]
+  initialPath?: string | null
 }
 
-export default function WorkspaceBrowser({ agents }: WorkspaceBrowserProps) {
-  const [selectedDir, setSelectedDir] = useState<string | null>(null)
+export default function WorkspaceBrowser({ agents, initialPath }: WorkspaceBrowserProps) {
+  const [selectedDir, setSelectedDir] = useState<string | null>(initialPath ?? null)
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
   const [favorites, setFavorites] = useState<Favorite[]>([])
 
