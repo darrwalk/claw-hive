@@ -87,9 +87,9 @@ docker compose -f "$REPO_ROOT/docker-compose.yml" up -d
 # Section 7: Remove host crontab entries (idempotent)
 # =============================================================================
 echo "==> Cleaning up host crontab..."
-if crontab -l 2>/dev/null | grep -qE 'hive-poll|hive-relay|hive-blocked-relay'; then
+if crontab -l 2>/dev/null | grep -qiE 'hive-poll|hive-relay|hive-blocked-relay|hive polling'; then
   TMPFILE=$(mktemp)
-  crontab -l 2>/dev/null | grep -vE 'hive-poll|hive-relay|hive-blocked-relay' > "$TMPFILE" || true
+  crontab -l 2>/dev/null | grep -viE 'hive-poll|hive-relay|hive-blocked-relay|hive polling' > "$TMPFILE" || true
   crontab "$TMPFILE"
   rm -f "$TMPFILE"
   echo "    Removed hive-* entries from host crontab"
