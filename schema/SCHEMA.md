@@ -23,6 +23,7 @@ Example: `20260215-143022-a7f3`
 | `project_id` | string\|null | no | Parent project ID |
 | `depends_on` | string[] | no | Task IDs that must complete first |
 | `output_path` | string\|null | no | Relative path to agent's output file |
+| `depth` | number | 0 | Spawn depth: 0 = human-created, 1 = agent-created sub-task. CLI rejects depth >= 2. |
 | `deadline_minutes` | number | no | Timeout in minutes (0 = no deadline) |
 | `blocked_on` | string\|null | no | `"human"`, `"task-{id}"`, or null |
 | `human_input` | object\|null | no | `{needed: string, provided: string\|null}` |

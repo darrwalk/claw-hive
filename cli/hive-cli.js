@@ -2,7 +2,7 @@
 
 import { Command } from 'commander';
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
-import { canComplete, shouldAutoCompleteParent } from './lib/lifecycle.js';
+import { canComplete, shouldAutoCompleteParent, validateDepth } from './lib/lifecycle.js';
 import { findStaleTasks } from './lib/stale-reaper.js';
 import { join, resolve, dirname } from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -94,10 +94,16 @@ program
   .option('--deadline <minutes>', 'Deadline in minutes')
   .option('--parent-task <id>', 'Parent task ID (for sub-tasks)')
   .option('--meta <key=value...>', 'Set metadata key=value (repeatable)')
+  .option('--depth <n>', 'Task spawn depth (0 = top-level)', '0')
   .option('--json', 'Output as JSON')
   .action((opts) => {
     ensureDirs();
 
+    const depthResult = validateDepth(opts.depth);
+    if (!depthResult.valid) {
+      console.error('Error: ' + depthResult.error);
+      process.exit(1);
+    }
 
     const taskId = generateId();
     const deadline = opts.deadline != null ? parseInt(opts.deadline) : (DEFAULT_DEADLINES[opts.type] ?? 0);
@@ -123,6 +129,7 @@ program
       parent_task: opts.parentTask || null,
       output_path: null,
       metadata,
+      depth: depthResult.depth,
       deadline_minutes: deadline,
       blocked_on: null,
       human_input: null,
