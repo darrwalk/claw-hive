@@ -17,3 +17,21 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+
+  poll-relay:
+    build:
+      context: .
+      dockerfile: poll-relay/Dockerfile
+    volumes:
+      - ${HIVE_DATA_DIR}:/hive-data:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID}"
+    environment:
+      HIVE_DATA_DIR: /hive-data
+      HIVE_CLI: /app/cli/hive-cli.js
+      BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      CHAT_ID: ${TELEGRAM_CHAT_ID}
+      THREAD_ID: ${TELEGRAM_THREAD_ID}
+      GATEWAY_CONTAINER: ${GATEWAY_CONTAINER:-openclaw-gateway-1}
+    restart: unless-stopped
