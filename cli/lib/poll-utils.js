@@ -12,7 +12,7 @@ export function filterReadyTasks(tasks, agentType, readTaskFn) {
     if (!t.depends_on || t.depends_on.length === 0) return true;
     return t.depends_on.every(depId => {
       const dep = readTaskFn(depId);
-      return dep && dep.status === 'completed';
+      return !dep || dep.status === 'completed';
     });
   });
 }

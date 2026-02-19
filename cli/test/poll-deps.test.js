@@ -67,10 +67,10 @@ describe('filterReadyTasks', () => {
     assert.equal(result.length, 1);
   });
 
-  it('blocks task when dependency does not exist (safe fallback)', () => {
-    const tasks = [task({ depends_on: ['nonexistent'] })];
+  it('unblocks task when dependency has been archived (not in active store)', () => {
+    const tasks = [task({ depends_on: ['archived-dep'] })];
     const result = filterReadyTasks(tasks, 'research', readTask({}));
-    assert.equal(result.length, 0);
+    assert.equal(result.length, 1);
   });
 
   it('filters out tasks with wrong type', () => {
