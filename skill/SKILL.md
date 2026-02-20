@@ -106,6 +106,49 @@ hive-cli show {task_id}          # single task detail
 hive-cli summary                 # counts by status
 ```
 
+## Workspace Browser
+
+Browse and read files in the agent workspace without shell escaping issues. All paths are relative to the workspace root.
+
+### List a directory
+
+```bash
+hive-cli workspace ls                    # workspace root
+hive-cli workspace ls skills             # subdirectory
+hive-cli workspace ls --json             # JSON output for parsing
+hive-cli workspace ls --all              # include hidden files (dotfiles)
+hive-cli workspace ls skills --json      # combine flags
+```
+
+Default output: one line per entry, `d`/`f` prefix indicates directory/file. Sorted: directories first, then alphabetical.
+
+JSON output: array of `{ name, type, size, modified }` objects.
+
+### Read a file
+
+```bash
+hive-cli workspace cat IDENTITY.md
+hive-cli workspace cat memory/$(date +%Y-%m-%d).md
+hive-cli workspace cat skills/hive/SKILL.md
+```
+
+- Text files print to stdout
+- Binary files are rejected with an error
+- Files over 100KB are truncated with a warning
+
+### Common patterns
+
+```bash
+# Find all skill directories
+hive-cli workspace ls skills --json | jq '.[].name'
+
+# Check if a file exists (exit code 0 = exists)
+hive-cli workspace cat some/file.md > /dev/null 2>&1 && echo "exists"
+
+# Read today's memory
+hive-cli workspace cat "memory/$(date +%Y-%m-%d).md"
+```
+
 ## Chaining Tasks (Multi-Step)
 
 When a request involves sequential steps (e.g., research then implement), create all sub-tasks upfront with dependency chaining and link them to the parent ops task:
