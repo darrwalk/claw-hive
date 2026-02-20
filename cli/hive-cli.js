@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
 import { canComplete, shouldAutoCompleteParent, validateDepth } from './lib/lifecycle.js';
+import { listDirectory, readFileContent } from './lib/workspace.js';
 import { findStaleTasks } from './lib/stale-reaper.js';
 import { findStrandedTasks } from './lib/resolve-waiting.js';
 import { pollUntilSettled } from './lib/poll-wait.js';
@@ -508,6 +509,45 @@ projectCmd
       console.log(JSON.stringify(project, null, 2));
     } else {
       console.log(`Updated project ${projectId}: ${project.title} [${project.status}]`);
+    }
+  });
+
+// workspace
+const workspaceCmd = program.command('workspace').description('Browse the agent workspace');
+
+workspaceCmd
+  .command('ls [path]')
+  .description('List workspace directory')
+  .option('--json', 'Output as JSON array')
+  .option('--all', 'Include hidden files (dotfiles)')
+  .action(async (path = '', opts) => {
+    try {
+      const entries = await listDirectory(path, { all: opts.all });
+      if (opts.json) {
+        console.log(JSON.stringify(entries, null, 2));
+      } else {
+        for (const e of entries) {
+          const typeChar = e.type === 'directory' ? 'd' : 'f';
+          console.log(`${typeChar}  ${e.name}`);
+        }
+      }
+    } catch (err) {
+      console.error(`Error: ${err.message}`);
+      process.exit(1);
+    }
+  });
+
+workspaceCmd
+  .command('cat <path>')
+  .description('Print workspace file content')
+  .action(async (path, _opts) => {
+    try {
+      const { content } = await readFileContent(path);
+      process.stdout.write(content);
+      if (!content.endsWith('\n')) process.stdout.write('\n');
+    } catch (err) {
+      console.error(`Error: ${err.message}`);
+      process.exit(1);
     }
   });
 
