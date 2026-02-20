@@ -84,6 +84,21 @@ echo "==> Starting services..."
 docker compose -f "$REPO_ROOT/docker-compose.yml" up -d
 
 # =============================================================================
+# Section 6b: Gateway wrapper deployment (idempotent: cp overwrites)
+# =============================================================================
+echo "==> Deploying gateway wrapper..."
+GATEWAY_CONTAINER="openclaw-gateway-1"
+WRAPPER_DEST="/home/node/clawd/bin/hive-cli"
+
+if docker ps --format '{{.Names}}' | grep -q "^${GATEWAY_CONTAINER}$"; then
+  docker cp "$REPO_ROOT/cli/wrapper.sh" "${GATEWAY_CONTAINER}:${WRAPPER_DEST}"
+  docker exec "$GATEWAY_CONTAINER" chmod +x "$WRAPPER_DEST"
+  echo "    Wrapper deployed to ${GATEWAY_CONTAINER}:${WRAPPER_DEST}"
+else
+  echo "    WARNING: ${GATEWAY_CONTAINER} not running — skipping wrapper deployment"
+fi
+
+# =============================================================================
 # Section 7: Remove host crontab entries (idempotent)
 # =============================================================================
 echo "==> Cleaning up host crontab..."
