@@ -29,9 +29,9 @@ PROVIDER_DEFS: dict[str, dict] = {
         "protocol": "openai",
     },
     "gemini": {
-        "url": "wss://generativelanguage.googleapis.com/v1beta/models",
+        "url": "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent",
         "key_env": "GOOGLE_API_KEY",
-        "model": "gemini-2.0-flash-live-001",
+        "model": "gemini-2.5-flash-native-audio-preview-12-2025",
         "voice": "Kore",
         "protocol": "gemini",
     },

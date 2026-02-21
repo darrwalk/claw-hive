@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "next build",
+    "lint:locale": "bash -c 'HITS=$(grep -rn \"toLocaleString\\|toLocaleDateString\\|toLocaleTimeString\" --include=\"*.tsx\" --include=\"*.ts\" app/ components/ lib/ 2>/dev/null | grep -v ClientDate | grep -v node_modules); if [ -n \"$HITS\" ]; then echo \"Use ClientDate instead of toLocale*:\"; echo \"$HITS\"; exit 1; fi; echo \"No locale issues found\"'"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

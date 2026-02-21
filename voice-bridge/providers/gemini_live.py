@@ -42,10 +42,7 @@ class GeminiLiveProvider(VoiceProvider):
 
     async def connect(self, instructions: str, tools: list[dict], vad: bool = False) -> None:
         model = self.config.model
-        url = (
-            f"{self.config.url}/{model}:BidiGenerateContent"
-            f"?key={self.config.api_key}&alt=ws"
-        )
+        url = f"{self.config.url}?key={self.config.api_key}"
 
         self._ws = await websockets.connect(url)
 
