@@ -172,9 +172,15 @@ export default function VoiceWidget() {
     }
     if (msg.role === 'assistant') {
       partialAssistantRef.current += msg.text
-      if (msg.final && partialAssistantRef.current.trim()) {
-        addMessage(partialAssistantRef.current, 'assistant')
+      if (msg.final) {
+        if (partialAssistantRef.current.trim()) {
+          addMessage(partialAssistantRef.current, 'assistant')
+        }
         partialAssistantRef.current = ''
+        if (!isPlayingRef.current) {
+          setStatus('connected')
+          setStatusText('Connected')
+        }
       }
     }
   }, [addMessage])
@@ -342,7 +348,8 @@ export default function VoiceWidget() {
     if (!open) return
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !e.repeat && e.target === document.body) {
+      const tag = (e.target as HTMLElement).tagName
+      if (e.code === 'Space' && !e.repeat && tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
         e.preventDefault()
         if (isHandsFreeRef.current) {
           isRecordingRef.current ? stopRecording() : startRecording()
@@ -352,7 +359,8 @@ export default function VoiceWidget() {
       }
     }
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && e.target === document.body) {
+      const tag = (e.target as HTMLElement).tagName
+      if (e.code === 'Space' && tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
         e.preventDefault()
         if (!isHandsFreeRef.current) stopRecording()
       }
@@ -390,8 +398,9 @@ export default function VoiceWidget() {
 
   return (
     <>
-      {/* Floating mic button */}
+      {/* Floating mic button — tabIndex -1 so Space goes to PTT, not toggle */}
       <button
+        tabIndex={-1}
         onClick={open ? handleClose : handleOpen}
         className={cn(
           'fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg',
@@ -459,6 +468,7 @@ export default function VoiceWidget() {
         {/* Controls */}
         <div className="flex flex-col items-center gap-2 border-t px-4 py-4">
           <button
+            tabIndex={-1}
             onPointerDown={(e) => {
               e.preventDefault()
               if (isHandsFree) {

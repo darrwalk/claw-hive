@@ -169,7 +169,7 @@
 
 <header>
   <div>
-    <h1>Claudia</h1>
+    <h1>Claudia <span style="font-size:10px;color:var(--text-dim)">v2</span></h1>
     <div class="status">
       <span class="status-dot" id="statusDot"></span>
       <span id="statusText">Disconnected</span>
@@ -464,7 +464,7 @@ talkBtn.addEventListener('pointerleave', function(e) {
 });
 
 document.addEventListener('keydown', function(e) {
-  if (e.code === 'Space' && !e.repeat && e.target === document.body) {
+  if (e.code === 'Space' && !e.repeat && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
     e.preventDefault();
     if (isHandsFree) {
       isRecording ? stopRecording() : startRecording();
@@ -474,7 +474,7 @@ document.addEventListener('keydown', function(e) {
   }
 });
 document.addEventListener('keyup', function(e) {
-  if (e.code === 'Space' && e.target === document.body) {
+  if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
     e.preventDefault();
     if (!isHandsFree) stopRecording();
   }
