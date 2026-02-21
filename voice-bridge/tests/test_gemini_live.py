@@ -17,6 +17,10 @@ import struct
 import pytest
 import websockets
 
+from config import ProviderConfig
+from providers.base import AudioEvent, TranscriptEvent
+from providers.gemini_live import GeminiLiveProvider
+
 testmark = pytest.mark.integration
 
 GEMINI_URL = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
@@ -232,3 +236,68 @@ class TestGeminiModeConstraints:
                 await ws.close()
             except websockets.ConnectionClosed:
                 pass
+
+
+def _provider_config() -> ProviderConfig:
+    key = _api_key()
+    return ProviderConfig(
+        url=GEMINI_URL,
+        api_key=key,
+        model=MODEL,
+        voice="Kore",
+        protocol="gemini",
+    )
+
+
+@testmark
+@pytest.mark.asyncio
+class TestGeminiProviderReceive:
+    """Verify the full provider receive chain: real API → receive() → events.
+
+    These tests use GeminiLiveProvider directly (not raw WebSocket) to catch
+    parsing bugs in the receive() method that raw-WS tests miss.
+    """
+
+    async def test_text_turn_emits_final_transcript_event(self) -> None:
+        """Send text turn via provider → must get AudioEvent + TranscriptEvent(final=True).
+
+        This is the assertion that would have caught the 'Processing...' bug:
+        if receive() fails to emit a final TranscriptEvent, the UI hangs.
+        """
+        config = _provider_config()
+        provider = GeminiLiveProvider(config)
+
+        async with asyncio.timeout(30):
+            await provider.connect(
+                instructions="Reply in one word only.",
+                tools=[],
+            )
+
+            # Send text turn via raw WS (provider has no send_text method)
+            assert provider._ws is not None
+            await provider._ws.send(json.dumps({
+                "client_content": {
+                    "turns": [{
+                        "role": "user",
+                        "parts": [{"text": "Say hello."}],
+                    }],
+                    "turnComplete": True,
+                },
+            }))
+
+            got_audio = False
+            got_final_transcript = False
+
+            async for event in provider.receive():
+                if isinstance(event, AudioEvent):
+                    got_audio = True
+                elif isinstance(event, TranscriptEvent) and event.final:
+                    got_final_transcript = True
+                    break
+
+            assert got_audio, "Expected at least one AudioEvent from provider.receive()"
+            assert got_final_transcript, (
+                "Expected TranscriptEvent(final=True) — absence causes 'Processing...' bug"
+            )
+
+            await provider.close()
