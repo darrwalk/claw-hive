@@ -415,12 +415,32 @@ function startRecording() {
   setStatus('recording', 'Listening...');
 }
 
+function sendTrailingSilence() {
+  // Gemini's server-side VAD needs silence in the audio stream to detect
+  // end-of-turn. When recording stops, audio stops flowing — the VAD never
+  // triggers. Send ~500ms of silence chunks so VAD sees speech→silence.
+  const rate = SAMPLE_RATE_GEMINI_IN;
+  const chunkMs = 100;
+  const chunks = 5;
+  const samplesPerChunk = Math.round(rate * chunkMs / 1000);
+  const silent = new Float32Array(samplesPerChunk); // all zeros = silence
+  for (let i = 0; i < chunks; i++) {
+    setTimeout(function() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'audio', data: float32ToPcm16B64(silent) }));
+      }
+    }, i * chunkMs);
+  }
+}
+
 function stopRecording() {
   if (!isRecording) return;
   isRecording = false;
   talkBtn.classList.remove('active');
   setStatus('connected', 'Processing...');
-  if (!isHandsFree && ws && ws.readyState === WebSocket.OPEN) {
+  if (currentProvider === 'gemini') {
+    sendTrailingSilence();
+  } else if (!isHandsFree && ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type: 'commit' }));
   }
 }

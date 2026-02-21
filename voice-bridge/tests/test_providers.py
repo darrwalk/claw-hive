@@ -165,15 +165,19 @@ class TestGeminiMessageFormats:
         assert "mimeType" in rt["audio"]
         assert rt["audio"]["mimeType"].startswith("audio/pcm")
 
-    async def test_commit_audio_is_noop(self) -> None:
-        """commit_audio must be a no-op — Gemini uses server-side VAD only.
+    async def test_commit_audio_sends_trailing_silence(self) -> None:
+        """commit_audio sends silence so server-side VAD detects end-of-turn.
 
-        Sending client_content after realtime_input audio causes
-        "invalid argument" from the Gemini API.
+        Gemini can't use client_content after realtime_input (causes error),
+        so we send silence audio chunks instead to trigger the VAD.
         """
         provider = self._make_provider()
         await provider.commit_audio()
-        provider._ws.send.assert_not_called()
+        assert provider._ws.send.call_count == 5
+        for call in provider._ws.send.call_args_list:
+            msg = json.loads(call.args[0])
+            assert "realtime_input" in msg
+            assert msg["realtime_input"]["audio"]["mimeType"] == "audio/pcm;rate=16000"
 
     async def test_send_tool_result_uses_snake_case_key(self) -> None:
         """Must use snake_case 'tool_response' (not camelCase 'toolResponse')."""
@@ -267,13 +271,17 @@ class TestGeminiReceiveEvents:
         assert events[0].final is True
         assert events[0].text == ""
 
-    async def test_text_response_emits_transcript_with_content(self) -> None:
-        """Text-only response should emit transcript with the text."""
+    async def test_text_parts_are_ignored(self) -> None:
+        """Text parts are Gemini's internal reasoning — must not be emitted.
+
+        Native audio model outputs chain-of-thought as text alongside audio.
+        Only turnComplete should produce a TranscriptEvent (empty, final).
+        """
         messages = [
             {
                 "serverContent": {
                     "modelTurn": {
-                        "parts": [{"text": "Hello!"}],
+                        "parts": [{"text": "**Thinking** I should say hello."}],
                     },
                     "turnComplete": True,
                 },
@@ -283,5 +291,6 @@ class TestGeminiReceiveEvents:
         events = [e async for e in provider.receive()]
 
         text_events = [e for e in events if isinstance(e, TranscriptEvent)]
-        assert any(e.text == "Hello!" for e in text_events)
-        assert any(e.final for e in text_events)
+        assert len(text_events) == 1
+        assert text_events[0].text == ""
+        assert text_events[0].final is True

@@ -1,8 +1,11 @@
 """Google Gemini Live provider — different protocol from OpenAI."""
 from __future__ import annotations
 
+import asyncio
+import base64
 import json
 import logging
+import struct
 from typing import AsyncIterator
 
 import websockets
@@ -92,9 +95,24 @@ class GeminiLiveProvider(VoiceProvider):
         }))
 
     async def commit_audio(self) -> None:
-        # No-op: Gemini native audio uses server-side VAD for turn detection.
-        # Sending client_content after realtime_input audio causes "invalid argument".
-        logger.debug("commit_audio is a no-op for Gemini (server-side VAD)")
+        # Gemini uses server-side VAD — no client_content commit is possible.
+        # But VAD needs silence in the audio stream to detect end-of-turn.
+        # When the browser stops recording, audio stops flowing and VAD never
+        # triggers. Send ~500ms of silence so VAD sees speech→silence.
+        if not self._ws:
+            return
+        n_samples = int(16000 * 0.1)  # 100ms at 16kHz
+        silence = base64.b64encode(struct.pack(f"<{n_samples}h", *([0] * n_samples))).decode()
+        for _ in range(5):
+            await self._ws.send(json.dumps({
+                "realtime_input": {
+                    "audio": {
+                        "data": silence,
+                        "mimeType": "audio/pcm;rate=16000",
+                    },
+                },
+            }))
+            await asyncio.sleep(0.1)
 
     async def receive(self) -> AsyncIterator[ProviderEvent]:
         if not self._ws:
@@ -108,21 +126,16 @@ class GeminiLiveProvider(VoiceProvider):
                     model_turn = content.get("modelTurn", {})
                     parts = model_turn.get("parts", [])
 
-                    has_text = False
                     for part in parts:
                         if "inlineData" in part:
                             data = part["inlineData"]
                             if data.get("mimeType", "").startswith("audio/"):
                                 yield AudioEvent(audio_b64=data["data"])
-                        elif "text" in part:
-                            has_text = True
-                            yield TranscriptEvent(
-                                text=part["text"],
-                                role="assistant",
-                                final=content.get("turnComplete", False),
-                            )
+                        # Gemini native audio emits text as internal reasoning,
+                        # not speech transcript — skip it to avoid leaking
+                        # chain-of-thought to the UI.
 
-                    if content.get("turnComplete") and not has_text:
+                    if content.get("turnComplete"):
                         yield TranscriptEvent(text="", role="assistant", final=True)
 
                 elif "toolCall" in msg:
