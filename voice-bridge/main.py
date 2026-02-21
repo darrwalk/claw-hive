@@ -16,7 +16,7 @@ from providers.gemini_live import GeminiLiveProvider
 from providers.openai_realtime import OpenAIRealtimeProvider
 from tools import TOOL_DEFINITIONS, execute_tool
 
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Claudia Voice Bridge")

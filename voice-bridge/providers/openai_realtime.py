@@ -102,16 +102,16 @@ class OpenAIRealtimeProvider(VoiceProvider):
                 msg = json.loads(raw)
                 event_type = msg.get("type", "")
 
-                if event_type == "response.audio.delta":
+                if event_type in ("response.audio.delta", "response.output_audio.delta"):
                     yield AudioEvent(audio_b64=msg["delta"])
 
-                elif event_type == "response.audio_transcript.delta":
+                elif event_type in ("response.audio_transcript.delta", "response.output_audio_transcript.delta"):
                     yield TranscriptEvent(
                         text=msg.get("delta", ""),
                         role="assistant",
                     )
 
-                elif event_type == "response.audio_transcript.done":
+                elif event_type in ("response.audio_transcript.done", "response.output_audio_transcript.done"):
                     yield TranscriptEvent(
                         text=msg.get("transcript", ""),
                         role="assistant",
@@ -148,8 +148,11 @@ class OpenAIRealtimeProvider(VoiceProvider):
                     "response.output_item.done",
                     "response.content_part.added",
                     "response.content_part.done",
+                    "response.output_audio.done",
                     "conversation.item.created",
+                    "conversation.item.added",
                     "input_audio_buffer.committed",
+                    "ping",
                 ):
                     pass  # known events we don't surface
                 else:
