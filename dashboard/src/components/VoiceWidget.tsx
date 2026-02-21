@@ -184,9 +184,8 @@ export default function VoiceWidget() {
   const connectWs = useCallback((provider: string) => {
     if (wsRef.current) wsRef.current.close()
 
-    const host = window.location.hostname
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const url = `${proto}//${host}:4200/ws?provider=${provider}`
+    const url = `${proto}//${window.location.host}/voice/ws?provider=${provider}`
 
     setStatus('connecting')
     setStatusText('Connecting...')
@@ -271,10 +270,8 @@ export default function VoiceWidget() {
   // ── Load providers ────────────────────────
 
   const loadProviders = useCallback(async () => {
-    const host = window.location.hostname
-    const proto = window.location.protocol
     try {
-      const res = await fetch(`${proto}//${host}:4200/config`)
+      const res = await fetch(`/voice/config`)
       const data = await res.json()
       const available = (data.providers as ProviderInfo[]).filter(p => p.available)
       setProviders(available)
