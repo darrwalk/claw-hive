@@ -245,10 +245,12 @@ function handleTranscript(msg) {
   }
   if (msg.role === 'assistant') {
     partialAssistant += msg.text;
-    if (msg.final && partialAssistant.trim()) {
-      addMessage(partialAssistant, 'assistant');
+    if (msg.final) {
+      if (partialAssistant.trim()) {
+        addMessage(partialAssistant, 'assistant');
+      }
       partialAssistant = '';
-      // Clear "Processing..." if no audio is playing
+      // Clear "Processing..." — audio playback handles its own status
       if (!isPlaying) setStatus('connected', 'Connected');
     }
   }
