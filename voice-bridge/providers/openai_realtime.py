@@ -62,7 +62,16 @@ class OpenAIRealtimeProvider(VoiceProvider):
         }
 
         if tools:
-            session_config["tools"] = tools
+            # Convert Chat Completions format to Realtime API format
+            session_config["tools"] = [
+                {
+                    "type": "function",
+                    "name": t["function"]["name"],
+                    "description": t["function"].get("description", ""),
+                    "parameters": t["function"].get("parameters", {}),
+                }
+                for t in tools
+            ]
             session_config["tool_choice"] = "auto"
 
         # For Grok, include model in session config
