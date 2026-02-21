@@ -84,10 +84,10 @@ class GeminiLiveProvider(VoiceProvider):
             return
         await self._ws.send(json.dumps({
             "realtimeInput": {
-                "mediaChunks": [{
-                    "mimeType": "audio/pcm;rate=16000",
+                "audio": {
                     "data": audio_b64,
-                }],
+                    "mimeType": "audio/pcm;rate=16000",
+                },
             },
         }))
 
@@ -97,6 +97,7 @@ class GeminiLiveProvider(VoiceProvider):
         # Signal end-of-turn so Gemini generates a response
         await self._ws.send(json.dumps({
             "clientContent": {
+                "turns": [],
                 "turnComplete": True,
             },
         }))
