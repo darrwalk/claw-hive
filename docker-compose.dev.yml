@@ -1,0 +1,18 @@
+services:
+  claw-hive-dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./dashboard/src:/app/src:cached
+      - ./dashboard/public:/app/public:cached
+      - ./dashboard/next.config.js:/app/next.config.js:ro
+      - ./dashboard/tsconfig.json:/app/tsconfig.json:ro
+      - ./dashboard/tailwind.config.js:/app/tailwind.config.js:ro
+      - ./dashboard/postcss.config.js:/app/postcss.config.js:ro
+      - ./dashboard/components.json:/app/components.json:ro
+
+  voice-bridge:
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./voice-bridge:/app:cached
