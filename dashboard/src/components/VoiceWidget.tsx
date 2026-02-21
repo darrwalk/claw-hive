@@ -516,14 +516,23 @@ export default function VoiceWidget() {
                 return next
               })
             }}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
-            Mode: {isHandsFree ? 'Hands-free (VAD)' : 'Push-to-talk'}
+            <span className={cn(
+              'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors',
+              isHandsFree ? 'bg-violet-600' : 'bg-muted-foreground/30',
+            )}>
+              <span className={cn(
+                'pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform mt-0.5',
+                isHandsFree ? 'translate-x-[18px]' : 'translate-x-0.5',
+              )} />
+            </span>
+            {isHandsFree ? 'Hands-free' : 'Push-to-talk'}
           </button>
 
           <span className="text-[11px] text-muted-foreground">
             {isHandsFree
-              ? 'Tap button to start/stop — VAD detects speech'
+              ? 'Open mic — VAD detects speech boundaries'
               : 'Hold button or press Space to talk'}
           </span>
         </div>
