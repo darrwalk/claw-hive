@@ -248,6 +248,8 @@ function handleTranscript(msg) {
     if (msg.final && partialAssistant.trim()) {
       addMessage(partialAssistant, 'assistant');
       partialAssistant = '';
+      // Clear "Processing..." if no audio is playing
+      if (!isPlaying) setStatus('connected', 'Connected');
     }
   }
 }

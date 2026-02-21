@@ -92,8 +92,14 @@ class GeminiLiveProvider(VoiceProvider):
         }))
 
     async def commit_audio(self) -> None:
-        # Gemini uses built-in VAD; commit is a no-op
-        pass
+        if not self._ws:
+            return
+        # Signal end-of-turn so Gemini generates a response
+        await self._ws.send(json.dumps({
+            "clientContent": {
+                "turnComplete": True,
+            },
+        }))
 
     async def receive(self) -> AsyncIterator[ProviderEvent]:
         if not self._ws:
