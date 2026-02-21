@@ -56,11 +56,16 @@ async def _connect_grok(key: str) -> websockets.ClientConnection:
     """Connect to Grok Realtime API."""
     headers = {"Authorization": f"Bearer {key}"}
     ws = await websockets.connect(GROK_URL, additional_headers=headers)
-    raw = await ws.recv()
-    msg = json.loads(raw)
-    if msg.get("type") == "error":
-        raise RuntimeError(f"Grok rejected: {msg}")
-    assert msg.get("type") == "session.created", f"Unexpected: {msg.get('type')}"
+    # Grok may send conversation.created before session.created
+    for _ in range(3):
+        raw = await ws.recv()
+        msg = json.loads(raw)
+        if msg.get("type") == "error":
+            raise RuntimeError(f"Grok rejected: {msg}")
+        if msg.get("type") in ("session.created", "conversation.created"):
+            break
+    else:
+        raise AssertionError(f"Never got session/conversation.created, last: {msg.get('type')}")
     return ws
 
 

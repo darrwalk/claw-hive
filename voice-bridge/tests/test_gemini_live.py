@@ -101,7 +101,15 @@ class TestGeminiAudio:
                 }))
                 await asyncio.sleep(0.05)
             # Connection should still be alive
-            assert ws.open, "WebSocket closed after sending audio"
+            # Verify connection still alive by sending one more chunk
+            await ws.send(json.dumps({
+                "realtime_input": {
+                    "audio": {
+                        "data": silence,
+                        "mimeType": "audio/pcm;rate=16000",
+                    },
+                },
+            }))
             await ws.close()
 
     async def test_commit_is_noop_keeps_connection(self) -> None:
@@ -124,7 +132,15 @@ class TestGeminiAudio:
             }))
             # Wait a bit — no commit sent
             await asyncio.sleep(1)
-            assert ws.open, "WebSocket should stay open without commit"
+            # Verify connection still alive by sending another chunk
+            await ws.send(json.dumps({
+                "realtime_input": {
+                    "audio": {
+                        "data": silence,
+                        "mimeType": "audio/pcm;rate=16000",
+                    },
+                },
+            }))
             await ws.close()
 
 
@@ -212,5 +228,7 @@ class TestGeminiModeConstraints:
             assert got_error, (
                 "Expected error/disconnect when mixing audio + client_content"
             )
-            if ws.open:
+            try:
                 await ws.close()
+            except websockets.ConnectionClosed:
+                pass
