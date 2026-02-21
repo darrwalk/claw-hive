@@ -356,7 +356,8 @@ async function initAudio() {
 function connect() {
   if (ws) ws.close();
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const url = proto + '//' + location.host + '/ws?provider=' + currentProvider;
+  const basePath = location.pathname.replace(/\/$/, '');
+  const url = proto + '//' + location.host + basePath + '/ws?provider=' + currentProvider;
   setStatus('', 'Connecting...');
 
   ws = new WebSocket(url);
@@ -473,7 +474,7 @@ providerSelect.addEventListener('change', function() {
 // ── Load available providers ─────────
 async function loadProviders() {
   try {
-    const res = await fetch('/config');
+    const res = await fetch(location.pathname.replace(/\/$/, '') + '/config');
     const data = await res.json();
     const costs = { grok: '~$0.05/min', openai: '~$0.18/min', gemini: 'free preview' };
     // Remove existing options
