@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
 from unittest.mock import AsyncMock
 
 import pytest
 
 from config import ProviderConfig
+from providers.base import AudioEvent, TranscriptEvent
 from providers.gemini_live import GeminiLiveProvider, _openai_tools_to_gemini
 from tools import TOOL_DEFINITIONS
 
@@ -186,3 +188,100 @@ class TestGeminiMessageFormats:
         resp = tr["functionResponses"][0]
         assert resp["id"] == "call-123"
         assert resp["response"]["result"] == "some result"
+
+
+@pytest.mark.asyncio
+class TestGeminiReceiveEvents:
+    """Validate events emitted by GeminiLiveProvider.receive().
+
+    Mocks incoming WebSocket messages to test the server-side relay logic.
+    """
+
+    @staticmethod
+    def _make_provider(messages: list[dict]) -> GeminiLiveProvider:
+        cfg = ProviderConfig(
+            url="wss://fake", api_key="fake", model="fake",
+            voice="Kore", protocol="gemini",
+        )
+        provider = GeminiLiveProvider(cfg)
+
+        class FakeWS:
+            """Fake WebSocket that yields pre-defined messages."""
+            def __aiter__(self) -> AsyncIterator[str]:
+                return self._gen()
+
+            async def _gen(self) -> AsyncIterator[str]:
+                for m in messages:
+                    yield json.dumps(m)
+
+        provider._ws = FakeWS()
+        return provider
+
+    async def test_audio_only_turn_emits_final_transcript(self) -> None:
+        """turnComplete without text parts must emit a final TranscriptEvent.
+
+        Gemini's native audio model often responds with audio but no text.
+        The empty final transcript is needed so the client can clear
+        'Processing...' status even when no audio plays back.
+        """
+        messages = [
+            {
+                "serverContent": {
+                    "modelTurn": {
+                        "parts": [{
+                            "inlineData": {
+                                "mimeType": "audio/pcm;rate=24000",
+                                "data": "AAAA",
+                            },
+                        }],
+                    },
+                    "turnComplete": True,
+                },
+            },
+        ]
+        provider = self._make_provider(messages)
+        events = [e async for e in provider.receive()]
+
+        assert any(isinstance(e, AudioEvent) for e in events)
+        final_transcripts = [
+            e for e in events
+            if isinstance(e, TranscriptEvent) and e.final
+        ]
+        assert len(final_transcripts) == 1, (
+            "Must emit a final TranscriptEvent on turnComplete even without text"
+        )
+        assert final_transcripts[0].text == ""
+
+    async def test_turn_complete_without_model_turn_emits_final(self) -> None:
+        """turnComplete with no modelTurn at all must emit final transcript.
+
+        Handles the case where Gemini sends a bare turnComplete (e.g. after
+        silence — no audio, no text).
+        """
+        messages = [{"serverContent": {"turnComplete": True}}]
+        provider = self._make_provider(messages)
+        events = [e async for e in provider.receive()]
+
+        assert len(events) == 1
+        assert isinstance(events[0], TranscriptEvent)
+        assert events[0].final is True
+        assert events[0].text == ""
+
+    async def test_text_response_emits_transcript_with_content(self) -> None:
+        """Text-only response should emit transcript with the text."""
+        messages = [
+            {
+                "serverContent": {
+                    "modelTurn": {
+                        "parts": [{"text": "Hello!"}],
+                    },
+                    "turnComplete": True,
+                },
+            },
+        ]
+        provider = self._make_provider(messages)
+        events = [e async for e in provider.receive()]
+
+        text_events = [e for e in events if isinstance(e, TranscriptEvent)]
+        assert any(e.text == "Hello!" for e in text_events)
+        assert any(e.final for e in text_events)
