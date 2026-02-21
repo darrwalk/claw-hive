@@ -1,7 +1,13 @@
 """Tests for provider tool format conversion — catches bug #2 (format mismatch)."""
 from __future__ import annotations
 
-from providers.gemini_live import _openai_tools_to_gemini
+import json
+from unittest.mock import AsyncMock
+
+import pytest
+
+from config import ProviderConfig
+from providers.gemini_live import GeminiLiveProvider, _openai_tools_to_gemini
 from tools import TOOL_DEFINITIONS
 
 
@@ -100,7 +106,7 @@ class TestSessionConfigShape:
     def test_gemini_setup_has_required_fields(self) -> None:
         # Simulate what GeminiLiveProvider.connect() builds
         setup: dict = {
-            "model": "models/gemini-2.0-flash-live-001",
+            "model": "models/gemini-2.5-flash-native-audio-preview-12-2025",
             "generationConfig": {
                 "responseModalities": ["AUDIO"],
                 "speechConfig": {
@@ -116,3 +122,62 @@ class TestSessionConfigShape:
         gen = setup["generationConfig"]
         assert "responseModalities" in gen
         assert "speechConfig" in gen
+
+
+@pytest.mark.asyncio
+class TestGeminiMessageFormats:
+    """Validate the exact JSON messages GeminiLiveProvider sends.
+
+    Catches format drift like mediaChunks→audio or missing turnComplete.turns.
+    Uses a mock WebSocket so no network calls are made.
+    """
+
+    @staticmethod
+    def _make_provider() -> GeminiLiveProvider:
+        cfg = ProviderConfig(
+            url="wss://fake", api_key="fake", model="fake",
+            voice="Kore", protocol="gemini",
+        )
+        provider = GeminiLiveProvider(cfg)
+        provider._ws = AsyncMock()
+        return provider
+
+    @staticmethod
+    def _sent_json(provider: GeminiLiveProvider) -> dict:
+        """Extract the JSON payload from the last ws.send() call."""
+        raw = provider._ws.send.call_args[0][0]
+        return json.loads(raw)
+
+    async def test_send_audio_uses_audio_field(self) -> None:
+        """Must use 'audio' not deprecated 'mediaChunks'."""
+        provider = self._make_provider()
+        await provider.send_audio("dGVzdA==")
+        msg = self._sent_json(provider)
+
+        rt = msg["realtimeInput"]
+        assert "audio" in rt, "realtimeInput must use 'audio' field (not 'mediaChunks')"
+        assert "mediaChunks" not in rt, "mediaChunks is deprecated"
+        assert "data" in rt["audio"]
+        assert "mimeType" in rt["audio"]
+        assert rt["audio"]["mimeType"].startswith("audio/pcm")
+
+    async def test_commit_audio_sends_turn_complete(self) -> None:
+        """Must send clientContent with turnComplete and turns."""
+        provider = self._make_provider()
+        await provider.commit_audio()
+        msg = self._sent_json(provider)
+
+        cc = msg["clientContent"]
+        assert cc["turnComplete"] is True
+        assert "turns" in cc, "clientContent requires 'turns' field"
+
+    async def test_send_tool_result_format(self) -> None:
+        provider = self._make_provider()
+        await provider.send_tool_result("call-123", "some result")
+        msg = self._sent_json(provider)
+
+        tr = msg["toolResponse"]
+        assert "functionResponses" in tr
+        resp = tr["functionResponses"][0]
+        assert resp["id"] == "call-123"
+        assert resp["response"]["result"] == "some result"
