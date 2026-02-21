@@ -332,6 +332,9 @@ function float32ToPcm16B64(float32) {
 }
 
 async function initAudio() {
+  if (!navigator.mediaDevices) {
+    throw new Error('Microphone requires HTTPS. Use https:// or add this origin to chrome://flags/#unsafely-treat-insecure-origin-as-secure');
+  }
   audioCtx = new AudioContext();
   micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   const source = audioCtx.createMediaStreamSource(micStream);
