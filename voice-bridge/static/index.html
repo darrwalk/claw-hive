@@ -470,6 +470,13 @@ modeToggle.addEventListener('click', function() {
 providerSelect.addEventListener('change', function() {
   currentProvider = providerSelect.value;
   partialAssistant = '';
+  // Gemini uses server-side VAD — force hands-free mode
+  if (currentProvider === 'gemini' && !isHandsFree) {
+    isHandsFree = true;
+    modeToggle.textContent = 'Mode: Hands-free (VAD)';
+    hint.textContent = 'Tap button to start/stop — VAD detects speech';
+    if (isRecording) stopRecording();
+  }
   connect();
 });
 
@@ -495,6 +502,12 @@ async function loadProviders() {
     if (first) {
       currentProvider = first;
       providerSelect.value = first;
+      // Gemini uses server-side VAD — auto-enable hands-free
+      if (first === 'gemini' && !isHandsFree) {
+        isHandsFree = true;
+        modeToggle.textContent = 'Mode: Hands-free (VAD)';
+        hint.textContent = 'Tap button to start/stop — VAD detects speech';
+      }
     }
   } catch (e) {
     console.warn('Could not load provider config', e);

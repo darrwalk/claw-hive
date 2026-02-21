@@ -148,35 +148,40 @@ class TestGeminiMessageFormats:
         raw = provider._ws.send.call_args[0][0]
         return json.loads(raw)
 
-    async def test_send_audio_uses_audio_field(self) -> None:
-        """Must use 'audio' not deprecated 'mediaChunks'."""
+    async def test_send_audio_uses_snake_case_key(self) -> None:
+        """Must use snake_case 'realtime_input' (not camelCase 'realtimeInput')."""
         provider = self._make_provider()
         await provider.send_audio("dGVzdA==")
         msg = self._sent_json(provider)
 
-        rt = msg["realtimeInput"]
-        assert "audio" in rt, "realtimeInput must use 'audio' field (not 'mediaChunks')"
+        assert "realtime_input" in msg, "Outer key must be snake_case"
+        assert "realtimeInput" not in msg, "camelCase outer key is rejected by API"
+        rt = msg["realtime_input"]
+        assert "audio" in rt, "Must use 'audio' field (not 'mediaChunks')"
         assert "mediaChunks" not in rt, "mediaChunks is deprecated"
         assert "data" in rt["audio"]
         assert "mimeType" in rt["audio"]
         assert rt["audio"]["mimeType"].startswith("audio/pcm")
 
-    async def test_commit_audio_sends_turn_complete(self) -> None:
-        """Must send clientContent with turnComplete and turns."""
+    async def test_commit_audio_is_noop(self) -> None:
+        """commit_audio must be a no-op — Gemini uses server-side VAD only.
+
+        Sending client_content after realtime_input audio causes
+        "invalid argument" from the Gemini API.
+        """
         provider = self._make_provider()
         await provider.commit_audio()
-        msg = self._sent_json(provider)
+        provider._ws.send.assert_not_called()
 
-        cc = msg["clientContent"]
-        assert cc["turnComplete"] is True
-        assert "turns" in cc, "clientContent requires 'turns' field"
-
-    async def test_send_tool_result_format(self) -> None:
+    async def test_send_tool_result_uses_snake_case_key(self) -> None:
+        """Must use snake_case 'tool_response' (not camelCase 'toolResponse')."""
         provider = self._make_provider()
         await provider.send_tool_result("call-123", "some result")
         msg = self._sent_json(provider)
 
-        tr = msg["toolResponse"]
+        assert "tool_response" in msg, "Outer key must be snake_case"
+        assert "toolResponse" not in msg, "camelCase outer key is rejected by API"
+        tr = msg["tool_response"]
         assert "functionResponses" in tr
         resp = tr["functionResponses"][0]
         assert resp["id"] == "call-123"

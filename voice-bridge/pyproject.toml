@@ -11,3 +11,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest>=8.0", "pytest-asyncio>=0.24"]
+
+[tool.pytest.ini_options]
+markers = ["integration: requires live API keys"]
+asyncio_mode = "auto"

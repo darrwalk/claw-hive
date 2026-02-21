@@ -83,7 +83,7 @@ class GeminiLiveProvider(VoiceProvider):
         if not self._ws:
             return
         await self._ws.send(json.dumps({
-            "realtimeInput": {
+            "realtime_input": {
                 "audio": {
                     "data": audio_b64,
                     "mimeType": "audio/pcm;rate=16000",
@@ -92,15 +92,9 @@ class GeminiLiveProvider(VoiceProvider):
         }))
 
     async def commit_audio(self) -> None:
-        if not self._ws:
-            return
-        # Signal end-of-turn so Gemini generates a response
-        await self._ws.send(json.dumps({
-            "clientContent": {
-                "turns": [],
-                "turnComplete": True,
-            },
-        }))
+        # No-op: Gemini native audio uses server-side VAD for turn detection.
+        # Sending client_content after realtime_input audio causes "invalid argument".
+        logger.debug("commit_audio is a no-op for Gemini (server-side VAD)")
 
     async def receive(self) -> AsyncIterator[ProviderEvent]:
         if not self._ws:
@@ -156,7 +150,7 @@ class GeminiLiveProvider(VoiceProvider):
         if not self._ws:
             return
         await self._ws.send(json.dumps({
-            "toolResponse": {
+            "tool_response": {
                 "functionResponses": [{
                     "id": call_id,
                     "name": "",  # Gemini doesn't require name in response
