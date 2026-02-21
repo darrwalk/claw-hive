@@ -38,7 +38,7 @@ ProviderEvent = AudioEvent | TranscriptEvent | ToolCallEvent | ErrorEvent
 
 class VoiceProvider(ABC):
     @abstractmethod
-    async def connect(self, instructions: str, tools: list[dict]) -> None:
+    async def connect(self, instructions: str, tools: list[dict], vad: bool = False) -> None:
         """Open connection to the provider with system instructions and tool definitions."""
 
     @abstractmethod

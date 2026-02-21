@@ -25,7 +25,7 @@ class OpenAIRealtimeProvider(VoiceProvider):
         self.config = config
         self._ws: websockets.ClientConnection | None = None
 
-    async def connect(self, instructions: str, tools: list[dict]) -> None:
+    async def connect(self, instructions: str, tools: list[dict], vad: bool = False) -> None:
         # OpenAI uses ?model= in URL; Grok doesn't (model set in session.update)
         url = self.config.url
         if "openai.com" in url:
@@ -58,7 +58,7 @@ class OpenAIRealtimeProvider(VoiceProvider):
                 "threshold": 0.5,
                 "prefix_padding_ms": 300,
                 "silence_duration_ms": 700,
-            },
+            } if vad else None,
         }
 
         if tools:
