@@ -25,7 +25,7 @@ PROVIDER_DEFS: dict[str, dict] = {
         "url": "wss://api.openai.com/v1/realtime",
         "key_env": "OPENAI_API_KEY",
         "model": "gpt-4o-realtime-preview",
-        "voice": "nova",
+        "voice": "sage",
         "protocol": "openai",
     },
     "gemini": {
