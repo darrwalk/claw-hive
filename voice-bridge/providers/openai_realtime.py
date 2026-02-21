@@ -24,6 +24,7 @@ class OpenAIRealtimeProvider(VoiceProvider):
     def __init__(self, config: ProviderConfig) -> None:
         self.config = config
         self._ws: websockets.ClientConnection | None = None
+        self._vad = False
 
     async def connect(self, instructions: str, tools: list[dict], vad: bool = False) -> None:
         # OpenAI uses ?model= in URL; Grok doesn't (model set in session.update)
@@ -31,6 +32,7 @@ class OpenAIRealtimeProvider(VoiceProvider):
         if "openai.com" in url:
             url = f"{url}?model={self.config.model}"
 
+        self._vad = vad
         headers = {"Authorization": f"Bearer {self.config.api_key}"}
         if "openai.com" in self.config.url:
             headers["OpenAI-Beta"] = "realtime=v1"
@@ -94,7 +96,7 @@ class OpenAIRealtimeProvider(VoiceProvider):
         }))
 
     async def commit_audio(self) -> None:
-        if not self._ws:
+        if not self._ws or self._vad:
             return
         await self._ws.send(json.dumps({
             "type": "input_audio_buffer.commit",

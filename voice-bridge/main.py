@@ -52,9 +52,9 @@ def _create_provider(name: str):
 
 
 @app.websocket("/ws")
-async def websocket_relay(ws: WebSocket, provider: str = "grok"):
+async def websocket_relay(ws: WebSocket, provider: str = "grok", vad: bool = False):
     await ws.accept()
-    logger.info("Browser connected, provider=%s", provider)
+    logger.info("Browser connected, provider=%s vad=%s", provider, vad)
 
     try:
         voice_provider = _create_provider(provider)
@@ -65,7 +65,7 @@ async def websocket_relay(ws: WebSocket, provider: str = "grok"):
 
     try:
         instructions = assemble_instructions()
-        await voice_provider.connect(instructions, TOOL_DEFINITIONS)
+        await voice_provider.connect(instructions, TOOL_DEFINITIONS, vad=vad)
         await ws.send_json({"type": "connected", "provider": provider})
     except Exception as e:
         logger.exception("Failed to connect to provider")

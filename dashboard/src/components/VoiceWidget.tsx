@@ -185,13 +185,38 @@ export default function VoiceWidget() {
     }
   }, [addMessage])
 
+  // ── Recording controls ────────────────────
+
+  const startRecording = useCallback(() => {
+    if (isRecordingRef.current) return
+    setIsRecording(true)
+    isRecordingRef.current = true
+    playbackQueueRef.current = []
+    setIsSpeaking(false)
+    isPlayingRef.current = false
+    setStatus('recording')
+    setStatusText('Listening...')
+  }, [])
+
+  const stopRecording = useCallback(() => {
+    if (!isRecordingRef.current) return
+    setIsRecording(false)
+    isRecordingRef.current = false
+    setStatus('connected')
+    setStatusText('Processing...')
+    if (!isHandsFreeRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'commit' }))
+    }
+  }, [])
+
   // ── WebSocket ─────────────────────────────
 
   const connectWs = useCallback((provider: string) => {
     if (wsRef.current) wsRef.current.close()
 
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const url = `${proto}//${window.location.hostname}:8443/ws?provider=${provider}`
+    const vad = isHandsFreeRef.current
+    const url = `${proto}//${window.location.hostname}:8443/ws?provider=${provider}&vad=${vad}`
 
     setStatus('connecting')
     setStatusText('Connecting...')
@@ -209,6 +234,7 @@ export default function VoiceWidget() {
         case 'connected':
           setStatus('connected')
           setStatusText(`Connected — ${msg.provider}`)
+          if (isHandsFreeRef.current) startRecording()
           break
         case 'audio':
           queueAudio(msg.data)
@@ -239,7 +265,7 @@ export default function VoiceWidget() {
       setStatus('error')
       setStatusText('Connection error')
     }
-  }, [queueAudio, handleTranscript, addMessage])
+  }, [queueAudio, handleTranscript, addMessage, startRecording])
 
   // ── Audio init ────────────────────────────
 
@@ -250,7 +276,9 @@ export default function VoiceWidget() {
     const audioCtx = new AudioContext()
     audioCtxRef.current = audioCtx
 
-    const micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    const micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true },
+    })
     micStreamRef.current = micStream
 
     const source = audioCtx.createMediaStreamSource(micStream)
@@ -316,30 +344,6 @@ export default function VoiceWidget() {
     isRecordingRef.current = false
     setStatus('disconnected')
     setStatusText('Disconnected')
-  }, [])
-
-  // ── Recording controls ────────────────────
-
-  const startRecording = useCallback(() => {
-    if (isRecordingRef.current) return
-    setIsRecording(true)
-    isRecordingRef.current = true
-    playbackQueueRef.current = []
-    setIsSpeaking(false)
-    isPlayingRef.current = false
-    setStatus('recording')
-    setStatusText('Listening...')
-  }, [])
-
-  const stopRecording = useCallback(() => {
-    if (!isRecordingRef.current) return
-    setIsRecording(false)
-    isRecordingRef.current = false
-    setStatus('connected')
-    setStatusText('Processing...')
-    if (!isHandsFreeRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'commit' }))
-    }
   }, [])
 
   // ── Keyboard (Space) ─────────────────────
@@ -503,7 +507,15 @@ export default function VoiceWidget() {
           </button>
 
           <button
-            onClick={() => setIsHandsFree(v => !v)}
+            onClick={() => {
+              setIsHandsFree(v => {
+                const next = !v
+                isHandsFreeRef.current = next
+                if (isRecording) stopRecording()
+                connectWs(currentProviderRef.current)
+                return next
+              })
+            }}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             Mode: {isHandsFree ? 'Hands-free (VAD)' : 'Push-to-talk'}

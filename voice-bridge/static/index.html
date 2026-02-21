@@ -340,7 +340,7 @@ async function initAudio() {
     throw new Error('Microphone requires HTTPS. Use https:// or add this origin to chrome://flags/#unsafely-treat-insecure-origin-as-secure');
   }
   audioCtx = new AudioContext();
-  micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true } });
   const source = audioCtx.createMediaStreamSource(micStream);
   const blob = new Blob([workletCode], { type: 'application/javascript' });
   const url = URL.createObjectURL(blob);
@@ -361,7 +361,7 @@ function connect() {
   if (ws) ws.close();
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const basePath = location.pathname.replace(/\/$/, '');
-  const url = proto + '//' + location.host + basePath + '/ws?provider=' + currentProvider;
+  const url = proto + '//' + location.host + basePath + '/ws?provider=' + currentProvider + '&vad=' + isHandsFree;
   setStatus('', 'Connecting...');
 
   ws = new WebSocket(url);
@@ -373,6 +373,7 @@ function connect() {
     switch (msg.type) {
       case 'connected':
         setStatus('connected', 'Connected \u2014 ' + msg.provider);
+        if (isHandsFree) startRecording();
         break;
       case 'audio':
         queueAudio(msg.data);
@@ -486,7 +487,8 @@ modeToggle.addEventListener('click', function() {
   hint.textContent = isHandsFree
     ? 'Tap button to start/stop \u2014 VAD detects speech'
     : 'Hold button or press Space to talk';
-  if (isRecording && !isHandsFree) stopRecording();
+  if (isRecording) stopRecording();
+  connect();
 });
 
 providerSelect.addEventListener('change', function() {
