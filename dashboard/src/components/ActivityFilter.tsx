@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import Link from 'next/link'
+import ClientDate from '@/components/ClientDate'
 
 interface FeedEntry {
   ts: string
@@ -48,7 +49,7 @@ export default function ActivityFilter({ feed, eventTypes, eventColors }: Props)
           filtered.slice(0, 100).map((entry, i) => (
             <div key={`${entry.task_id}-${entry.ts}-${i}`} className="flex items-start gap-3 rounded-md border bg-card p-3">
               <div className="text-xs text-muted-foreground whitespace-nowrap font-mono mt-0.5 w-[140px] shrink-0">
-                {new Date(entry.ts).toLocaleString()}
+                <ClientDate iso={entry.ts} />
               </div>
               <Badge className={`text-[10px] shrink-0 ${eventColors[entry.event] || 'bg-secondary text-muted-foreground'}`}>
                 {entry.event}

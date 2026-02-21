@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import ClientDate from '@/components/ClientDate'
 import { ExternalLink } from 'lucide-react'
 import Link from 'next/link'
 
@@ -222,7 +223,7 @@ export default function TaskDetailDialog({ task, open, onOpenChange }: Props) {
               {[...task.log].reverse().map((entry, i) => (
                 <div key={`${entry.ts}-${i}`} className="text-xs flex gap-2">
                   <span className="text-muted-foreground whitespace-nowrap font-mono">
-                    {new Date(entry.ts).toLocaleString()}
+                    <ClientDate iso={entry.ts} />
                   </span>
                   <Badge variant="secondary" className="text-[10px] shrink-0">{entry.event}</Badge>
                   <span className="text-muted-foreground break-words">{entry.detail}</span>

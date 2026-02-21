@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Folder, File, FileText, Image, Video, Star, Search, ChevronRight, ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Favorite } from '@/lib/workspace'
+import ClientDate from '@/components/ClientDate'
 
 interface DirEntry {
   name: string
@@ -26,10 +27,9 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function formatDate(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+function FormatDate({ iso }: { iso: string }) {
+  if (!iso) return null
+  return <ClientDate iso={iso} mode="date" />
 }
 
 function getFileIcon(name: string) {
@@ -170,7 +170,7 @@ export default function DirectoryContents({ path, favorites, onNavigateDir, onSe
                       {isDir ? '—' : formatSize(entry.size)}
                     </td>
                     <td className="px-4 py-2 text-right text-muted-foreground">
-                      {formatDate(entry.modified)}
+                      <FormatDate iso={entry.modified} />
                     </td>
                   </tr>
                 )

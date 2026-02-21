@@ -5,9 +5,10 @@ import { useEffect, useState } from 'react'
 
 export default function RefreshWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter()
-  const [lastRefresh, setLastRefresh] = useState(new Date())
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
 
   useEffect(() => {
+    setLastRefresh(new Date())
     const interval = setInterval(() => {
       router.refresh()
       setLastRefresh(new Date())
@@ -18,7 +19,7 @@ export default function RefreshWrapper({ children }: { children: React.ReactNode
   return (
     <>
       <div className="refresh-bar">
-        Updated {lastRefresh.toLocaleTimeString()}
+        Updated {lastRefresh?.toLocaleTimeString()}
       </div>
       {children}
     </>
