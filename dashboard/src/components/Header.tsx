@@ -12,9 +12,10 @@ interface HeaderProps {
 
 export default function Header({ onNewTask, onMenuToggle }: HeaderProps) {
   const router = useRouter()
-  const [lastRefresh, setLastRefresh] = useState(new Date())
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
 
   useEffect(() => {
+    setLastRefresh(new Date())
     const interval = setInterval(() => {
       router.refresh()
       setLastRefresh(new Date())
@@ -31,7 +32,7 @@ export default function Header({ onNewTask, onMenuToggle }: HeaderProps) {
           </button>
           <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
             <RefreshCw className="h-3 w-3" />
-            Updated {lastRefresh.toLocaleTimeString()}
+            Updated {lastRefresh?.toLocaleTimeString()}
           </div>
         </div>
         <Button size="sm" onClick={onNewTask}>
