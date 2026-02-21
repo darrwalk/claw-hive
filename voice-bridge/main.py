@@ -16,7 +16,7 @@ from providers.gemini_live import GeminiLiveProvider
 from providers.openai_realtime import OpenAIRealtimeProvider
 from tools import TOOL_DEFINITIONS, execute_tool
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Claudia Voice Bridge")
@@ -71,6 +71,7 @@ async def websocket_relay(ws: WebSocket, provider: str = "grok"):
         """Forward provider events to the browser."""
         try:
             async for event in voice_provider.receive():
+                logger.info("Provider event: %s", type(event).__name__)
                 if isinstance(event, AudioEvent):
                     await ws.send_json({
                         "type": "audio",
@@ -115,8 +116,10 @@ async def websocket_relay(ws: WebSocket, provider: str = "grok"):
             msg_type = msg.get("type", "")
 
             if msg_type == "audio":
+                logger.debug("Audio chunk from browser: %d chars", len(msg["data"]))
                 await voice_provider.send_audio(msg["data"])
             elif msg_type == "commit":
+                logger.info("Audio commit from browser")
                 await voice_provider.commit_audio()
             elif msg_type == "close":
                 break
