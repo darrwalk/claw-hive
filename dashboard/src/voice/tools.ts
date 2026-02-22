@@ -143,13 +143,16 @@ import { execFile } from 'child_process'
 
 const GATEWAY_CONTAINER = process.env.GATEWAY_CONTAINER || 'openclaw-gateway-1'
 
-async function delegateToAgent(request: string): Promise<string> {
+async function delegateToAgent(request: string, sessionId?: string): Promise<string> {
   const prompt = `Respond concisely — your answer will be read aloud in a voice conversation. Keep it under 500 words. No markdown formatting.\n\n${request}`
+
+  const args = ['exec', GATEWAY_CONTAINER, 'node', 'dist/index.js', 'agent', '--agent', 'main', '-m', prompt]
+  if (sessionId) args.push('--session-id', sessionId)
 
   return new Promise((resolve) => {
     const child = execFile(
       'docker',
-      ['exec', GATEWAY_CONTAINER, 'node', 'dist/index.js', 'agent', '--agent', 'main', '-m', prompt],
+      args,
       { timeout: 120_000 },
       (error, stdout, stderr) => {
         if (error) {
@@ -167,7 +170,7 @@ async function delegateToAgent(request: string): Promise<string> {
   })
 }
 
-export async function executeTool(name: string, arguments_: string): Promise<string> {
+export async function executeTool(name: string, arguments_: string, sessionId?: string): Promise<string> {
   let args: Record<string, string>
   try {
     args = JSON.parse(arguments_)
@@ -181,7 +184,7 @@ export async function executeTool(name: string, arguments_: string): Promise<str
     case 'read_file':
       return readWorkspaceFile(args.path || '')
     case 'delegate':
-      return delegateToAgent(args.request || '')
+      return delegateToAgent(args.request || '', sessionId)
     default:
       return `Unknown tool: ${name}`
   }
