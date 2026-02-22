@@ -1,11 +1,54 @@
 import type WebSocket from 'ws'
 import type { IncomingMessage } from 'http'
-import { getProvider } from './config'
+import { mkdir, writeFile } from 'fs/promises'
+import { join } from 'path'
+import { getProvider, WORKSPACE_DIR } from './config'
 import { assembleInstructions } from './instructions'
 import { executeTool, TOOL_DEFINITIONS } from './tools'
 import type { VoiceProvider } from './providers/base'
 import { OpenAIRealtimeProvider } from './providers/openai-realtime'
 import { GeminiLiveProvider } from './providers/gemini-live'
+
+interface LogEntry {
+  role: 'user' | 'assistant' | 'tool'
+  text: string
+}
+
+async function saveTranscript(provider: string, entries: LogEntry[], startTime: Date): Promise<void> {
+  if (entries.length === 0) return
+  const dir = join(WORKSPACE_DIR, 'memory', 'voice-logs')
+  await mkdir(dir, { recursive: true })
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const d = startTime
+  const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}-${pad(d.getMinutes())}`
+  const filename = `${stamp}.md`
+
+  const duration = Math.round((Date.now() - startTime.getTime()) / 1000)
+  const mins = Math.floor(duration / 60)
+  const secs = duration % 60
+
+  const lines = [
+    `# Voice Session — ${stamp}`,
+    '',
+    `**Provider:** ${provider} | **Duration:** ${mins}m ${secs}s`,
+    '',
+    '---',
+    '',
+  ]
+
+  for (const entry of entries) {
+    if (entry.role === 'tool') {
+      lines.push(`*${entry.text}*`, '')
+    } else {
+      const label = entry.role === 'user' ? '**Arnd:**' : '**Claudia:**'
+      lines.push(`${label} ${entry.text}`, '')
+    }
+  }
+
+  await writeFile(join(dir, filename), lines.join('\n'))
+  console.log(`[voice] Transcript saved: memory/voice-logs/${filename}`)
+}
 
 function createProvider(name: string): VoiceProvider {
   const cfg = getProvider(name)
@@ -19,6 +62,10 @@ export async function handleVoiceSocket(ws: WebSocket, req: IncomingMessage): Pr
   const vad = url.searchParams.get('vad') === 'true'
 
   console.log(`[voice] Browser connected, provider=${providerName} vad=${vad}`)
+
+  const startTime = new Date()
+  const log: LogEntry[] = []
+  let partialAssistant = ''
 
   let voiceProvider: VoiceProvider
   try {
@@ -52,6 +99,15 @@ export async function handleVoiceSocket(ws: WebSocket, req: IncomingMessage): Pr
             break
           case 'transcript':
             ws.send(JSON.stringify({ type: 'transcript', role: event.role, text: event.text, final: event.final }))
+            if (event.role === 'user' && event.final && event.text.trim()) {
+              log.push({ role: 'user', text: event.text.trim() })
+            } else if (event.role === 'assistant') {
+              partialAssistant += event.text
+              if (event.final) {
+                if (partialAssistant.trim()) log.push({ role: 'assistant', text: partialAssistant.trim() })
+                partialAssistant = ''
+              }
+            }
             break
           case 'tool_call': {
             console.log(`[voice] Tool call: ${event.name}(${event.arguments.slice(0, 100)})`)
@@ -59,6 +115,7 @@ export async function handleVoiceSocket(ws: WebSocket, req: IncomingMessage): Pr
             const result = await executeTool(event.name, event.arguments)
             await voiceProvider.sendToolResult(event.callId, result)
             ws.send(JSON.stringify({ type: 'tool_result', name: event.name, result: result.slice(0, 200) }))
+            log.push({ role: 'tool', text: `[${event.name}] ${result.slice(0, 200)}` })
             break
           }
           case 'error':
@@ -98,5 +155,10 @@ export async function handleVoiceSocket(ws: WebSocket, req: IncomingMessage): Pr
   ws.on('close', async () => {
     console.log('[voice] Browser disconnected')
     await voiceProvider.close()
+    try {
+      await saveTranscript(providerName, log, startTime)
+    } catch (e) {
+      console.error('[voice] Failed to save transcript:', e)
+    }
   })
 }
