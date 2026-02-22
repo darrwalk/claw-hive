@@ -22,6 +22,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Custom server + voice modules (compiled from server.ts + src/voice/)
 COPY --from=builder --chown=nextjs:nodejs /app/dist-server/server.js ./server.js
 COPY --from=builder --chown=nextjs:nodejs /app/dist-server/src/voice ./src/voice
+# ws is required by custom server but not included in Next.js standalone output
+COPY --from=deps /app/node_modules/ws ./node_modules/ws
 RUN apk add --no-cache curl
 USER nextjs
 EXPOSE 3000
