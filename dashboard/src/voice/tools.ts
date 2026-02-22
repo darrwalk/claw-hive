@@ -44,7 +44,7 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
     function: {
       name: 'delegate',
       description:
-        'Delegate a request to the main Claudia agent. Use when the user asks for something beyond memory search — email, web search, calendar, tasks, code, infrastructure, or anything you cannot handle directly.',
+        'REQUIRED: Hand off a request to Claudia\'s main agent. You MUST call this for email, web search, calendar, tasks, code, infrastructure, weather, news, or anything outside your memory files. Never refuse — always delegate.',
       parameters: {
         type: 'object',
         properties: {
