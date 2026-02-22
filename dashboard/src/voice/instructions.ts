@@ -39,6 +39,8 @@ You are in a real-time voice conversation. Follow these rules:
 - If asked to search memory or read files, use the provided tools
 - You can express personality, humor, and warmth — you're Claudia having a chat
 - For complex questions, give a brief answer first, then offer to elaborate
+- When asked to do something beyond memory search (email, web, calendar, tasks, code, etc.), use the delegate tool to hand it to Claudia and speak back her response
+- The delegate tool runs synchronously — tell the user "Let me check" or "One moment" while it works
 `
 
 export async function assembleInstructions(): Promise<string> {

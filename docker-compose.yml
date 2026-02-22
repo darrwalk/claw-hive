@@ -3,6 +3,9 @@ services:
     build: ./dashboard
     ports:
       - "100.99.29.88:4100:3000"
+    networks:
+      - default
+      - openclaw_default
     volumes:
       - ${HIVE_DATA_DIR:-./hive-data}:/app/data/hive:rw
       - ./cli:/app/cli:ro
@@ -14,6 +17,8 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - XAI_API_KEY=${XAI_API_KEY}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GATEWAY_URL=http://openclaw-gateway-1:18789
+      - OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
@@ -39,3 +44,6 @@ services:
       GATEWAY_CONTAINER: ${GATEWAY_CONTAINER:-openclaw-gateway-1}
     restart: unless-stopped
 
+networks:
+  openclaw_default:
+    external: true

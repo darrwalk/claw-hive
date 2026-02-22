@@ -96,6 +96,7 @@ export default function VoiceWidget() {
   const isRecordingRef = useRef(false)
   const isHandsFreeRef = useRef(false)
   const partialAssistantRef = useRef('')
+  const processingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const transcriptEndRef = useRef<HTMLDivElement>(null)
   const initedRef = useRef(false)
   const currentProviderRef = useRef('grok')
@@ -121,6 +122,13 @@ export default function VoiceWidget() {
 
   const getOutputSampleRate = useCallback(() => {
     return currentProviderRef.current === 'gemini' ? SAMPLE_RATE_GEMINI_OUT : SAMPLE_RATE_OPENAI
+  }, [])
+
+  const clearProcessingTimeout = useCallback(() => {
+    if (processingTimeoutRef.current) {
+      clearTimeout(processingTimeoutRef.current)
+      processingTimeoutRef.current = null
+    }
   }, [])
 
   // ── Playback ──────────────────────────────
@@ -154,6 +162,7 @@ export default function VoiceWidget() {
   }, [getOutputSampleRate])
 
   const queueAudio = useCallback((b64data: string) => {
+    clearProcessingTimeout()
     const bytes = atob(b64data)
     const buf = new Int16Array(bytes.length / 2)
     const view = new DataView(new ArrayBuffer(bytes.length))
@@ -161,7 +170,7 @@ export default function VoiceWidget() {
     for (let i = 0; i < buf.length; i++) buf[i] = view.getInt16(i * 2, true)
     playbackQueueRef.current.push(buf)
     if (!isPlayingRef.current) playNext()
-  }, [playNext])
+  }, [playNext, clearProcessingTimeout])
 
   // ── Transcript handling ───────────────────
 
@@ -173,17 +182,18 @@ export default function VoiceWidget() {
     if (msg.role === 'assistant') {
       partialAssistantRef.current += msg.text
       if (msg.final) {
+        clearProcessingTimeout()
         if (partialAssistantRef.current.trim()) {
           addMessage(partialAssistantRef.current, 'assistant')
         }
         partialAssistantRef.current = ''
-        if (!isPlayingRef.current) {
+        if (!isPlayingRef.current && playbackQueueRef.current.length === 0) {
           setStatus('connected')
           setStatusText('Connected')
         }
       }
     }
-  }, [addMessage])
+  }, [addMessage, clearProcessingTimeout])
 
   // ── Recording controls ────────────────────
 
@@ -202,12 +212,24 @@ export default function VoiceWidget() {
     if (!isRecordingRef.current) return
     setIsRecording(false)
     isRecordingRef.current = false
+    isPlayingRef.current = false
     setStatus('connected')
     setStatusText('Processing...')
     if (!isHandsFreeRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'commit' }))
     }
-  }, [])
+    clearProcessingTimeout()
+    processingTimeoutRef.current = setTimeout(() => {
+      setStatus(prev => {
+        if (prev === 'connected' || prev === 'recording' || prev === 'disconnected') return prev
+        return 'connected'
+      })
+      setStatusText(prev => {
+        if (['Connected', 'Listening...', 'Disconnected'].includes(prev)) return prev
+        return 'Connected'
+      })
+    }, 15_000)
+  }, [clearProcessingTimeout])
 
   // ── WebSocket ─────────────────────────────
 
@@ -336,6 +358,7 @@ export default function VoiceWidget() {
 
   const handleClose = useCallback(() => {
     setOpen(false)
+    clearProcessingTimeout()
     if (wsRef.current) {
       wsRef.current.close()
       wsRef.current = null
@@ -344,7 +367,7 @@ export default function VoiceWidget() {
     isRecordingRef.current = false
     setStatus('disconnected')
     setStatusText('Disconnected')
-  }, [])
+  }, [clearProcessingTimeout])
 
   // ── Keyboard (Space) ─────────────────────
 

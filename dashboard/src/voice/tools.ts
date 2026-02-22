@@ -39,6 +39,24 @@ export const TOOL_DEFINITIONS: ToolDef[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'delegate',
+      description:
+        'Delegate a request to the main Claudia agent. Use when the user asks for something beyond memory search — email, web search, calendar, tasks, code, infrastructure, or anything you cannot handle directly.',
+      parameters: {
+        type: 'object',
+        properties: {
+          request: {
+            type: 'string',
+            description: "The user's request to pass to Claudia, in natural language",
+          },
+        },
+        required: ['request'],
+      },
+    },
+  },
 ]
 
 function safePath(relative: string): string | null {
@@ -121,6 +139,54 @@ async function readWorkspaceFile(path: string): Promise<string> {
   }
 }
 
+const GATEWAY_URL = process.env.GATEWAY_URL || 'http://openclaw-gateway-1:18789'
+const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || ''
+
+async function delegateToAgent(request: string): Promise<string> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 120_000)
+
+  try {
+    const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(GATEWAY_TOKEN ? { Authorization: `Bearer ${GATEWAY_TOKEN}` } : {}),
+      },
+      body: JSON.stringify({
+        model: 'openclaw:main',
+        stream: false,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Respond concisely — your answer will be read aloud in a voice conversation. Keep it under 500 words. No markdown formatting.',
+          },
+          { role: 'user', content: request },
+        ],
+      }),
+      signal: controller.signal,
+    })
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return `Claudia returned an error (${res.status}): ${body.slice(0, 200)}`
+    }
+
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string } }[]
+    }
+    return data.choices?.[0]?.message?.content || 'Claudia returned an empty response.'
+  } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') {
+      return 'The request to Claudia timed out after 2 minutes. Try a simpler question.'
+    }
+    return `Failed to reach Claudia: ${e}`
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 export async function executeTool(name: string, arguments_: string): Promise<string> {
   let args: Record<string, string>
   try {
@@ -134,6 +200,8 @@ export async function executeTool(name: string, arguments_: string): Promise<str
       return searchMemory(args.query || '')
     case 'read_file':
       return readWorkspaceFile(args.path || '')
+    case 'delegate':
+      return delegateToAgent(args.request || '')
     default:
       return `Unknown tool: ${name}`
   }
