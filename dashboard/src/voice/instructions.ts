@@ -28,6 +28,42 @@ async function latestStateOfArnd(memoryDir: string): Promise<string | null> {
   }
 }
 
+const VOICE_LOGS_DIR = 'memory/voice-logs'
+const MAX_TRANSCRIPT_FILES = 20
+const MAX_TRANSCRIPT_CHARS = 30_000
+
+async function recentTranscripts(voiceLogsDir: string): Promise<string | null> {
+  try {
+    const files = await readdir(voiceLogsDir)
+    const mdFiles = files
+      .filter(f => f.endsWith('.md'))
+      .sort()
+      .reverse()
+      .slice(0, MAX_TRANSCRIPT_FILES)
+
+    if (mdFiles.length === 0) return null
+
+    let total = 0
+    const parts: string[] = []
+    for (const file of mdFiles) {
+      const content = await readFile(join(voiceLogsDir, file), 'utf-8')
+      if (total + content.length > MAX_TRANSCRIPT_CHARS) break
+      parts.push(`## ${file.replace(/\.md$/, '')}\n\n${content.trim()}`)
+      total += content.length
+    }
+
+    if (parts.length === 0) return null
+
+    return `# Recent Voice Conversations
+
+These are your recent voice sessions with Arnd. Use them for conversational continuity — reference past topics naturally.
+
+${parts.join('\n\n---\n\n')}`
+  } catch {
+    return null
+  }
+}
+
 const VOICE_ADDENDUM = `# Voice Conversation Mode
 
 You are in a real-time voice conversation. Follow these rules:
@@ -63,6 +99,10 @@ export async function assembleInstructions(): Promise<string> {
   // Voice skill (prefer SKILL.md over hardcoded addendum)
   const voiceSkill = await readOptional(join(WORKSPACE_DIR, VOICE_SKILL_PATH))
   sections.push(voiceSkill ? voiceSkill.trim() : VOICE_ADDENDUM)
+
+  // Recent voice transcripts for conversational continuity
+  const transcripts = await recentTranscripts(join(WORKSPACE_DIR, VOICE_LOGS_DIR))
+  if (transcripts) sections.push(transcripts)
 
   return sections.join('\n\n---\n\n')
 }
