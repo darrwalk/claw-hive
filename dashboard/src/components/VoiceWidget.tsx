@@ -216,7 +216,7 @@ export default function VoiceWidget() {
 
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const vad = isHandsFreeRef.current
-    const url = `${proto}//${window.location.hostname}:8443/ws?provider=${provider}&vad=${vad}`
+    const url = `${proto}//${window.location.host}/api/voice?provider=${provider}&vad=${vad}`
 
     setStatus('connecting')
     setStatusText('Connecting...')
@@ -305,7 +305,7 @@ export default function VoiceWidget() {
 
   const loadProviders = useCallback(async () => {
     try {
-      const res = await fetch(`${window.location.protocol}//${window.location.hostname}:8443/config`)
+      const res = await fetch('/api/voice-config')
       const data = await res.json()
       const available = (data.providers as ProviderInfo[]).filter(p => p.available)
       setProviders(available)

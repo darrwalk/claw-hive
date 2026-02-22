@@ -11,8 +11,6 @@ services:
       - ./dashboard/tailwind.config.js:/app/tailwind.config.js:ro
       - ./dashboard/postcss.config.js:/app/postcss.config.js:ro
       - ./dashboard/components.json:/app/components.json:ro
+      - ./dashboard/server.ts:/app/server.ts:ro
+      - ./dashboard/tsconfig.server.json:/app/tsconfig.server.json:ro
 
-  voice-bridge:
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-    volumes:
-      - ./voice-bridge:/app:cached

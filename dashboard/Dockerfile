@@ -9,6 +9,7 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Build Next.js app + compile custom server
 RUN npm run build
 
 FROM base AS runner
@@ -18,6 +19,9 @@ RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Custom server + voice modules (compiled from server.ts + src/voice/)
+COPY --from=builder --chown=nextjs:nodejs /app/dist-server/server.js ./server.js
+COPY --from=builder --chown=nextjs:nodejs /app/dist-server/src/voice ./src/voice
 RUN apk add --no-cache curl
 USER nextjs
 EXPOSE 3000
