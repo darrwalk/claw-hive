@@ -61,8 +61,7 @@ export async function handleVoiceSocket(ws: WebSocket, req: IncomingMessage): Pr
   const providerName = url.searchParams.get('provider') || 'grok'
   const vad = url.searchParams.get('vad') === 'true'
 
-  const sessionId = `voice-${Date.now()}`
-  console.log(`[voice] Browser connected, provider=${providerName} vad=${vad} session=${sessionId}`)
+  console.log(`[voice] Browser connected, provider=${providerName} vad=${vad}`)
 
   const startTime = new Date()
   const log: LogEntry[] = []
@@ -113,7 +112,7 @@ export async function handleVoiceSocket(ws: WebSocket, req: IncomingMessage): Pr
           case 'tool_call': {
             console.log(`[voice] Tool call: ${event.name}(${event.arguments.slice(0, 100)})`)
             ws.send(JSON.stringify({ type: 'tool_call', name: event.name }))
-            const result = await executeTool(event.name, event.arguments, sessionId)
+            const result = await executeTool(event.name, event.arguments)
             await voiceProvider.sendToolResult(event.callId, result)
             ws.send(JSON.stringify({ type: 'tool_result', name: event.name, result: result.slice(0, 200) }))
             log.push({ role: 'tool', text: `[${event.name}] ${result.slice(0, 200)}` })

@@ -139,38 +139,32 @@ async function readWorkspaceFile(path: string): Promise<string> {
   }
 }
 
-import { execFile } from 'child_process'
+const GATEWAY_URL = process.env.GATEWAY_URL || 'http://openclaw-gateway-1:18789'
+const GATEWAY_TOKEN = process.env.GATEWAY_TOKEN
 
-const GATEWAY_CONTAINER = process.env.GATEWAY_CONTAINER || 'openclaw-gateway-1'
-
-async function delegateToAgent(request: string, sessionId?: string): Promise<string> {
+async function delegateToAgent(request: string): Promise<string> {
   const prompt = `Respond concisely — your answer will be read aloud in a voice conversation. Keep it under 500 words. No markdown formatting.\n\n${request}`
 
-  const args = ['exec', GATEWAY_CONTAINER, 'node', 'dist/index.js', 'agent', '--agent', 'main', '-m', prompt]
-  if (sessionId) args.push('--session-id', sessionId)
-
-  return new Promise((resolve) => {
-    const child = execFile(
-      'docker',
-      args,
-      { timeout: 120_000 },
-      (error, stdout, stderr) => {
-        if (error) {
-          if (error.killed) {
-            resolve('The request to Claudia timed out after 2 minutes. Try a simpler question.')
-          } else {
-            resolve(`Failed to reach Claudia: ${stderr || error.message}`)
-          }
-          return
-        }
-        resolve(stdout.trim() || 'Claudia returned an empty response.')
-      },
-    )
-    child.stdin?.end()
+  const res = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(GATEWAY_TOKEN && { Authorization: `Bearer ${GATEWAY_TOKEN}` }),
+      'x-openclaw-session-key': 'voice-main',
+    },
+    body: JSON.stringify({
+      model: 'openclaw:main',
+      messages: [{ role: 'user', content: prompt }],
+    }),
+    signal: AbortSignal.timeout(120_000),
   })
+
+  if (!res.ok) return `Failed to reach Claudia: ${res.status} ${await res.text()}`
+  const data = await res.json()
+  return data.choices?.[0]?.message?.content?.trim() || 'Claudia returned an empty response.'
 }
 
-export async function executeTool(name: string, arguments_: string, sessionId?: string): Promise<string> {
+export async function executeTool(name: string, arguments_: string): Promise<string> {
   let args: Record<string, string>
   try {
     args = JSON.parse(arguments_)
@@ -184,7 +178,7 @@ export async function executeTool(name: string, arguments_: string, sessionId?: 
     case 'read_file':
       return readWorkspaceFile(args.path || '')
     case 'delegate':
-      return delegateToAgent(args.request || '', sessionId)
+      return delegateToAgent(args.request || '')
     default:
       return `Unknown tool: ${name}`
   }

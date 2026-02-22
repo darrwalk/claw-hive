@@ -10,9 +10,6 @@ services:
       - ${HIVE_DATA_DIR:-./hive-data}:/app/data/hive:rw
       - ./cli:/app/cli:ro
       - ${WORKSPACE_DIR:-/home/openclaw/workspace}:/app/workspace:rw
-      - /var/run/docker.sock:/var/run/docker.sock
-    group_add:
-      - "${DOCKER_GID}"
     environment:
       - HIVE_DATA_PATH=/app/data/hive
       - WORKSPACE_PATH=/app/workspace
@@ -20,7 +17,8 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - XAI_API_KEY=${XAI_API_KEY}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - GATEWAY_CONTAINER=${GATEWAY_CONTAINER:-openclaw-gateway-1}
+      - GATEWAY_URL=${GATEWAY_URL:-http://openclaw-gateway-1:18789}
+      - GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]

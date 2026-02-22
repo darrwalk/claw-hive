@@ -25,7 +25,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/dist-server/src/voice ./src/voice
 # Standalone trims node_modules — restore ws + full next for custom server
 COPY --from=deps /app/node_modules/ws ./node_modules/ws
 COPY --from=deps /app/node_modules/next ./node_modules/next
-RUN apk add --no-cache curl docker-cli
+RUN apk add --no-cache curl
 USER nextjs
 EXPOSE 3000
 ENV HOSTNAME=0.0.0.0
