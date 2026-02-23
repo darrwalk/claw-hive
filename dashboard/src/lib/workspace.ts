@@ -1,6 +1,13 @@
 import { readdir, readFile, writeFile, stat } from 'fs/promises'
 import { join, resolve, extname } from 'path'
 import { getActiveTasks, getArchivedTasks } from './tasks'
+import { MAIN_AGENT } from './constants'
+
+export function resolveVirtualPath(path: string): string {
+  if (path === MAIN_AGENT) return ''
+  if (path.startsWith(MAIN_AGENT + '/')) return path.slice(MAIN_AGENT.length + 1)
+  return path
+}
 
 export const WORKSPACE_PATH = process.env.WORKSPACE_PATH || '/app/workspace'
 const DATA_PATH = process.env.HIVE_DATA_PATH || '/app/data/hive'

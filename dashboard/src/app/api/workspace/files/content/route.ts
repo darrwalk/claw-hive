@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readFileContent } from '@/lib/workspace'
+import { readFileContent, resolveVirtualPath } from '@/lib/workspace'
 
 export async function GET(req: NextRequest) {
-  const path = req.nextUrl.searchParams.get('path')
-  if (!path) return NextResponse.json({ error: 'path required' }, { status: 400 })
+  const raw = req.nextUrl.searchParams.get('path')
+  if (!raw) return NextResponse.json({ error: 'path required' }, { status: 400 })
+  const path = resolveVirtualPath(raw)
 
   try {
     const result = await readFileContent(path)

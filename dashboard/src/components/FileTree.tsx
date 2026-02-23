@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { ChevronRight, ChevronDown, Folder, Star, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { MAIN_AGENT } from '@/lib/constants'
 import type { Favorite } from '@/lib/workspace'
 
 interface DirEntry {
@@ -94,6 +95,8 @@ function TreeNode({ path, entry, depth, selectedDir, expandedDirs, favorites, fi
 export default function FileTree({ agents, favorites, selectedDir, onSelectDir, onToggleFavorite }: FileTreeProps) {
   const [expandedDirs, setExpandedDirs] = useState<Record<string, DirEntry[]>>({})
   const [filter, setFilter] = useState('')
+  const allEntries = useMemo(() => [MAIN_AGENT, ...agents], [agents])
+  const agentSet = useMemo(() => new Set(agents), [agents])
 
   const toggleDir = useCallback(async (path: string) => {
     if (path in expandedDirs) {
@@ -108,9 +111,12 @@ export default function FileTree({ agents, favorites, selectedDir, onSelectDir, 
     }
     const res = await fetch(`/api/workspace/files?path=${encodeURIComponent(path)}`)
     if (!res.ok) return
-    const entries: DirEntry[] = await res.json()
+    let entries: DirEntry[] = await res.json()
+    if (path === MAIN_AGENT) {
+      entries = entries.filter(e => !(e.type === 'directory' && agentSet.has(e.name)))
+    }
     setExpandedDirs(prev => ({ ...prev, [path]: entries }))
-  }, [expandedDirs])
+  }, [expandedDirs, agentSet])
 
   const expandToPath = useCallback(async (targetPath: string) => {
     const parts = targetPath.split('/')
@@ -126,9 +132,9 @@ export default function FileTree({ agents, favorites, selectedDir, onSelectDir, 
   }, [expandedDirs])
 
   const agentsWithMatches = useMemo(() => {
-    if (!filter) return new Set(agents)
+    if (!filter) return new Set(allEntries)
     const matching = new Set<string>()
-    for (const agent of agents) {
+    for (const agent of allEntries) {
       if (agent.toLowerCase().includes(filter.toLowerCase())) {
         matching.add(agent)
         continue
@@ -144,7 +150,7 @@ export default function FileTree({ agents, favorites, selectedDir, onSelectDir, 
       if (agent in expandedDirs) matching.add(agent)
     }
     return matching
-  }, [agents, filter, expandedDirs])
+  }, [allEntries, filter, expandedDirs])
 
   const handleFavoriteClick = useCallback((fav: Favorite) => {
     const hasExtension = fav.path.includes('.') && fav.path.lastIndexOf('.') > fav.path.lastIndexOf('/')
@@ -198,7 +204,7 @@ export default function FileTree({ agents, favorites, selectedDir, onSelectDir, 
           </div>
         )}
 
-        {agents.filter(a => agentsWithMatches.has(a)).map(agent => {
+        {allEntries.filter(a => agentsWithMatches.has(a)).map(agent => {
           const isExpanded = agent in expandedDirs
           const isSelected = selectedDir === agent
           const isFavorited = favorites.some(f => f.path === agent)
@@ -250,7 +256,7 @@ export default function FileTree({ agents, favorites, selectedDir, onSelectDir, 
 
         {agentsWithMatches.size === 0 && (
           <div className="text-center py-8 text-muted-foreground text-xs">
-            {agents.length === 0 ? 'No agents found' : 'No matches'}
+            {allEntries.length === 0 ? 'No agents found' : 'No matches'}
           </div>
         )}
       </div>

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { listDirectory } from '@/lib/workspace'
+import { listDirectory, resolveVirtualPath } from '@/lib/workspace'
 
 export async function GET(req: NextRequest) {
-  const path = req.nextUrl.searchParams.get('path')
-  if (!path) return NextResponse.json({ error: 'path required' }, { status: 400 })
+  const raw = req.nextUrl.searchParams.get('path')
+  if (raw === null) return NextResponse.json({ error: 'path required' }, { status: 400 })
+  const path = resolveVirtualPath(raw)
 
   try {
     const entries = await listDirectory(path)
