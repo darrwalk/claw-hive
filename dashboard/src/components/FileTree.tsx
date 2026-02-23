@@ -65,7 +65,7 @@ function TreeNode({ path, entry, depth, selectedDir, expandedDirs, favorites, fi
     <div>
       <div className="group flex items-center">
         <button
-          onClick={() => { onSelectDir(fullPath); if (!isExpanded) onToggle(fullPath) }}
+          onClick={() => { onSelectDir(fullPath); onToggle(fullPath) }}
           className={cn(
             'flex-1 flex items-center gap-1.5 py-1 px-2 text-xs rounded-md transition-colors text-left',
             isSelected ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
@@ -212,7 +212,7 @@ export default function FileTree({ agents, favorites, selectedDir, onSelectDir, 
             <div key={agent}>
               <div className="group flex items-center">
                 <button
-                  onClick={() => { onSelectDir(agent); if (!isExpanded) toggleDir(agent) }}
+                  onClick={() => { onSelectDir(agent); toggleDir(agent) }}
                   className={cn(
                     'flex-1 flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded-md transition-colors',
                     isSelected ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
