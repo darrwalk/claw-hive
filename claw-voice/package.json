@@ -1,0 +1,26 @@
+{
+  "name": "claw-voice",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc && tsx widget/build.ts",
+    "start": "node dist/server.js",
+    "build:widget": "tsx widget/build.ts"
+  },
+  "dependencies": {
+    "fastify": "^5.7.0",
+    "@fastify/websocket": "^11.2.0",
+    "@fastify/static": "^9.0.0",
+    "@fastify/cors": "^11.2.0",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,6 +1,6 @@
 import WebSocket from 'ws'
-import type { ProviderConfig } from '../config'
-import type { ProviderEvent, ToolDef, VoiceProvider } from './base'
+import type { ProviderConfig } from '../config.js'
+import type { ProviderEvent, ToolDef, VoiceProvider } from './base.js'
 
 function openaiToolsToGemini(tools: ToolDef[]): Record<string, unknown>[] {
   return tools
@@ -13,9 +13,8 @@ function openaiToolsToGemini(tools: ToolDef[]): Record<string, unknown>[] {
 }
 
 function generateSilenceB64(): string {
-  // 100ms of silence at 16kHz, signed 16-bit LE
   const nSamples = 1600
-  const buf = Buffer.alloc(nSamples * 2) // all zeros = silence
+  const buf = Buffer.alloc(nSamples * 2)
   return buf.toString('base64')
 }
 
@@ -31,13 +30,11 @@ export class GeminiLiveProvider implements VoiceProvider {
     const url = `${this.config.url}?key=${this.config.apiKey}`
     this.ws = new WebSocket(url)
 
-    // Wait for open
     await new Promise<void>((resolve, reject) => {
       this.ws!.once('open', resolve)
       this.ws!.once('error', reject)
     })
 
-    // Build setup message
     const setup: Record<string, unknown> = {
       model: `models/${this.config.model}`,
       generationConfig: {
@@ -60,7 +57,6 @@ export class GeminiLiveProvider implements VoiceProvider {
 
     this.ws.send(JSON.stringify({ setup }))
 
-    // Wait for setupComplete
     await new Promise<void>((resolve, reject) => {
       this.ws!.once('message', (raw) => {
         const msg = JSON.parse(raw.toString())
@@ -85,8 +81,6 @@ export class GeminiLiveProvider implements VoiceProvider {
   }
 
   async commitAudio(): Promise<void> {
-    // Gemini uses server-side VAD only. Send ~500ms of silence so VAD
-    // sees speech→silence and triggers end-of-turn.
     if (!this.ws) return
     const silence = generateSilenceB64()
     for (let i = 0; i < 5; i++) {
@@ -114,7 +108,6 @@ export class GeminiLiveProvider implements VoiceProvider {
           if (part.inlineData?.mimeType?.startsWith('audio/')) {
             yield { kind: 'audio', audioB64: part.inlineData.data }
           }
-          // Text from Gemini native audio is internal reasoning — skip it
         }
         if (content.turnComplete) {
           yield { kind: 'transcript', text: '', role: 'assistant', final: true }
@@ -128,10 +121,7 @@ export class GeminiLiveProvider implements VoiceProvider {
             arguments: JSON.stringify(fnCall.args || {}),
           }
         }
-      } else if ('interrupted' in msg) {
-        // logged, not surfaced
       }
-      // setupComplete and others silently ignored
     }
   }
 

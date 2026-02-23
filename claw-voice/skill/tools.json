@@ -1,0 +1,4 @@
+{
+  "builtin": ["search_memory", "read_file"],
+  "gateway": []
+}

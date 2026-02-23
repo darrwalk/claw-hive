@@ -1,6 +1,6 @@
 import WebSocket from 'ws'
-import type { ProviderConfig } from '../config'
-import type { ProviderEvent, ToolDef, VoiceProvider } from './base'
+import type { ProviderConfig } from '../config.js'
+import type { ProviderEvent, ToolDef, VoiceProvider } from './base.js'
 
 export class OpenAIRealtimeProvider implements VoiceProvider {
   private ws: WebSocket | null = null
@@ -26,7 +26,6 @@ export class OpenAIRealtimeProvider implements VoiceProvider {
 
     this.ws = new WebSocket(url, { headers })
 
-    // Wait for connection + session.created
     await new Promise<void>((resolve, reject) => {
       this.ws!.once('error', reject)
       this.ws!.once('message', (raw) => {
@@ -39,7 +38,6 @@ export class OpenAIRealtimeProvider implements VoiceProvider {
       })
     })
 
-    // Build session config
     const sessionConfig: Record<string, unknown> = {
       modalities: ['audio', 'text'],
       instructions,
@@ -62,7 +60,6 @@ export class OpenAIRealtimeProvider implements VoiceProvider {
       sessionConfig.tool_choice = 'auto'
     }
 
-    // Grok needs model in session config
     if (this.config.url.includes('x.ai')) {
       sessionConfig.model = this.config.model
     }
@@ -106,7 +103,6 @@ export class OpenAIRealtimeProvider implements VoiceProvider {
       } else if (t === 'error') {
         yield { kind: 'error', message: msg.error?.message || JSON.stringify(msg) }
       }
-      // All other known events silently ignored
     }
   }
 

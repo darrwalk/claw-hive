@@ -1,6 +1,6 @@
 import { readFile, readdir } from 'fs/promises'
 import { join } from 'path'
-import { WORKSPACE_DIR } from './config'
+import { WORKSPACE_DIR } from './config.js'
 
 const PERSONALITY_FILES = ['SOUL.md', 'IDENTITY.md', 'USER.md']
 const MEMORY_FILE = 'memory.md'
@@ -82,25 +82,20 @@ You are in a real-time voice conversation. Follow these rules:
 export async function assembleInstructions(): Promise<string> {
   const sections: string[] = []
 
-  // Core personality files
   for (const filename of PERSONALITY_FILES) {
     const content = await readOptional(join(WORKSPACE_DIR, filename))
     if (content) sections.push(content.trim())
   }
 
-  // Memory context
   const memory = await readOptional(join(WORKSPACE_DIR, MEMORY_FILE))
   if (memory) sections.push(`# Current Memory\n\n${memory.trim()}`)
 
-  // Latest state of Arnd
   const state = await latestStateOfArnd(join(WORKSPACE_DIR, 'memory'))
   if (state) sections.push(`# Latest State Update\n\n${state.trim()}`)
 
-  // Voice skill (prefer SKILL.md over hardcoded addendum)
   const voiceSkill = await readOptional(join(WORKSPACE_DIR, VOICE_SKILL_PATH))
   sections.push(voiceSkill ? voiceSkill.trim() : VOICE_ADDENDUM)
 
-  // Recent voice transcripts for conversational continuity
   const transcripts = await recentTranscripts(join(WORKSPACE_DIR, VOICE_LOGS_DIR))
   if (transcripts) sections.push(transcripts)
 

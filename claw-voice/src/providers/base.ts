@@ -14,7 +14,7 @@ export interface ToolCallEvent {
   kind: 'tool_call'
   callId: string
   name: string
-  arguments: string // JSON string
+  arguments: string
 }
 
 export interface ErrorEvent {
