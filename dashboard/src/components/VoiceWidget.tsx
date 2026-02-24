@@ -15,11 +15,17 @@ declare global {
   }
 }
 
-const VOICE_PORT = 4200
+const VOICE_PORT_HTTP = 4200
+const VOICE_PORT_HTTPS = 8443
+
+function getVoicePort(): number {
+  if (typeof window === 'undefined') return VOICE_PORT_HTTP
+  return window.location.protocol === 'https:' ? VOICE_PORT_HTTPS : VOICE_PORT_HTTP
+}
 
 function getVoiceUrl(): string {
   if (typeof window === 'undefined') return ''
-  return `${window.location.protocol}//${window.location.hostname}:${VOICE_PORT}`
+  return `${window.location.protocol}//${window.location.hostname}:${getVoicePort()}`
 }
 
 export default function VoiceWidget() {
@@ -44,7 +50,7 @@ export default function VoiceWidget() {
   if (!ready || !voiceUrl) return null
 
   const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const wsUrl = `${wsProto}//${window.location.hostname}:${VOICE_PORT}/ws`
+  const wsUrl = `${wsProto}//${window.location.hostname}:${getVoicePort()}/ws`
 
   return (
     <div className="fixed bottom-6 right-6 z-50 w-80 h-[480px]">
