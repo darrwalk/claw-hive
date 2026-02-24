@@ -90,9 +90,9 @@ export class GeminiLiveProvider implements VoiceProvider {
   }
 
   async commitAudio(): Promise<void> {
-    if (!this.ws) return
     const silence = generateSilenceB64()
     for (let i = 0; i < 5; i++) {
+      if (!this.ws) return
       this.ws.send(
         JSON.stringify({
           realtime_input: {
