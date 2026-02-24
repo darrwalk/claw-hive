@@ -8,6 +8,7 @@ export async function voiceWsRoutes(app: FastifyInstance, toolRegistry: ToolRegi
     const provider = q.provider || 'grok'
     const vad = q.vad === 'true'
     const voice = q.voice || ''
-    handleVoiceSocket(socket, provider, vad, voice, toolRegistry)
+    const sample = q.sample === 'true'
+    handleVoiceSocket(socket, provider, vad, voice, sample, toolRegistry)
   })
 }

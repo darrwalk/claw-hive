@@ -464,6 +464,7 @@ export class ClawVoice extends HTMLElement {
   private providerVoices: Record<string, string[]> = {}
   private transcript: TranscriptEntry[] = []
   private audioInited = false
+  private pendingSample = false
   private processingTimeout: ReturnType<typeof setTimeout> | null = null
 
   // DOM refs
@@ -546,6 +547,7 @@ export class ClawVoice extends HTMLElement {
     this.voiceSelect.addEventListener('change', () => {
       this.currentVoice = this.voiceSelect.value
       this.savePrefs()
+      this.pendingSample = true
       this.connectWs()
     })
 
@@ -718,7 +720,9 @@ export class ClawVoice extends HTMLElement {
     if (this.ws) this.ws.close()
 
     const voiceParam = this.currentVoice ? `&voice=${encodeURIComponent(this.currentVoice)}` : ''
-    const url = `${this.wsUrl}?provider=${this.currentProvider}&vad=${this.isHandsFree}${voiceParam}`
+    const sampleParam = this.pendingSample ? '&sample=true' : ''
+    this.pendingSample = false
+    const url = `${this.wsUrl}?provider=${this.currentProvider}&vad=${this.isHandsFree}${voiceParam}${sampleParam}`
     this.setStatus('', 'Connecting...')
 
     this.ws = new WebSocket(url)

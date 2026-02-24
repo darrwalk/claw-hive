@@ -70,6 +70,15 @@ export class GeminiLiveProvider implements VoiceProvider {
     })
   }
 
+  async sendText(text: string): Promise<void> {
+    this.ws?.send(JSON.stringify({
+      client_content: {
+        turns: [{ role: 'user', parts: [{ text }] }],
+        turn_complete: true,
+      },
+    }))
+  }
+
   async sendAudio(audioB64: string): Promise<void> {
     this.ws?.send(
       JSON.stringify({

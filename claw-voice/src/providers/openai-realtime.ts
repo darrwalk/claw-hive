@@ -67,6 +67,19 @@ export class OpenAIRealtimeProvider implements VoiceProvider {
     this.ws.send(JSON.stringify({ type: 'session.update', session: sessionConfig }))
   }
 
+  async sendText(text: string): Promise<void> {
+    if (!this.ws) return
+    this.ws.send(JSON.stringify({
+      type: 'conversation.item.create',
+      item: {
+        type: 'message',
+        role: 'user',
+        content: [{ type: 'input_text', text }],
+      },
+    }))
+    this.ws.send(JSON.stringify({ type: 'response.create' }))
+  }
+
   async sendAudio(audioB64: string): Promise<void> {
     this.ws?.send(JSON.stringify({ type: 'input_audio_buffer.append', audio: audioB64 }))
   }

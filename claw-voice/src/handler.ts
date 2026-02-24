@@ -14,14 +14,17 @@ function createProvider(name: string, voice: string): VoiceProvider {
   return new OpenAIRealtimeProvider(cfg)
 }
 
+const SAMPLE_PHRASE = 'Say a short greeting — just one sentence to demonstrate your voice.'
+
 export async function handleVoiceSocket(
   ws: WebSocket,
   providerName: string,
   vad: boolean,
   voice: string,
+  sample: boolean,
   toolRegistry: ToolRegistry,
 ): Promise<void> {
-  console.log(`[voice] Browser connected, provider=${providerName} vad=${vad} voice=${voice || '(default)'}`)
+  console.log(`[voice] Browser connected, provider=${providerName} vad=${vad} voice=${voice || '(default)'} sample=${sample}`)
 
   const startTime = new Date()
   const log: LogEntry[] = []
@@ -40,6 +43,10 @@ export async function handleVoiceSocket(
     const instructions = await assembleInstructions()
     await voiceProvider.connect(instructions, toolRegistry.definitions, vad)
     ws.send(JSON.stringify({ type: 'connected', provider: providerName }))
+    if (sample) {
+      console.log('[voice] Sending voice sample prompt')
+      await voiceProvider.sendText(SAMPLE_PHRASE)
+    }
   } catch (e) {
     console.error('[voice] Failed to connect to provider:', e)
     ws.send(JSON.stringify({ type: 'error', message: String(e) }))

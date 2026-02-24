@@ -35,6 +35,7 @@ export interface ToolDef {
 
 export interface VoiceProvider {
   connect(instructions: string, tools: ToolDef[], vad?: boolean): Promise<void>
+  sendText(text: string): Promise<void>
   sendAudio(audioB64: string): Promise<void>
   commitAudio(): Promise<void>
   receive(): AsyncGenerator<ProviderEvent>
