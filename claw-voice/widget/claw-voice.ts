@@ -64,6 +64,7 @@ interface ProviderInfo {
 const STYLES = `
 :host {
   display: block;
+  height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --bg: #0f0f14;
   --surface: #1a1a24;
@@ -234,6 +235,28 @@ header h1 { font-size: 18px; font-weight: 600; }
   font-size: 12px;
   color: var(--text-dim);
 }
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.collapse-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px 8px;
+  line-height: 1;
+}
+.collapse-btn:hover { color: var(--text); }
+:host(.collapsed) .transcript,
+:host(.collapsed) .controls {
+  display: none;
+}
+:host(.collapsed) .container {
+  height: auto;
+}
 `
 
 function createMicIcon(): SVGSVGElement {
@@ -314,7 +337,15 @@ function buildDOM(shadow: ShadowRoot): Record<string, HTMLElement> {
   const providerSelect = document.createElement('select')
   providerSelect.className = 'provider-select'
   providerSelect.id = 'providerSelect'
-  header.append(headerLeft, providerSelect)
+  const collapseBtn = document.createElement('button')
+  collapseBtn.className = 'collapse-btn'
+  collapseBtn.id = 'collapseBtn'
+  collapseBtn.textContent = '▼'
+  collapseBtn.title = 'Collapse widget'
+  const headerRight = document.createElement('div')
+  headerRight.className = 'header-right'
+  headerRight.append(providerSelect, collapseBtn)
+  header.append(headerLeft, headerRight)
 
   // Transcript
   const transcript = document.createElement('div')
@@ -342,7 +373,7 @@ function buildDOM(shadow: ShadowRoot): Record<string, HTMLElement> {
   shadow.append(style, container)
 
   return {
-    transcript, talkBtn, statusDot, statusText, providerSelect, modeToggle, hint,
+    transcript, talkBtn, statusDot, statusText, providerSelect, modeToggle, hint, collapseBtn,
   }
 }
 
@@ -372,6 +403,7 @@ export class ClawVoice extends HTMLElement {
   private providerSelect!: HTMLSelectElement
   private modeToggle!: HTMLElement
   private hintEl!: HTMLElement
+  private collapseBtn!: HTMLElement
 
   static get observedAttributes(): string[] {
     return ['ws-url', 'provider', 'theme', 'mode']
@@ -391,6 +423,7 @@ export class ClawVoice extends HTMLElement {
     this.providerSelect = els.providerSelect as HTMLSelectElement
     this.modeToggle = els.modeToggle
     this.hintEl = els.hint
+    this.collapseBtn = els.collapseBtn
     this.bindEvents()
     this.init()
   }
@@ -418,6 +451,12 @@ export class ClawVoice extends HTMLElement {
   }
 
   private bindEvents(): void {
+    this.collapseBtn.addEventListener('click', () => {
+      const collapsed = this.classList.toggle('collapsed')
+      this.collapseBtn.textContent = collapsed ? '▲' : '▼'
+      this.collapseBtn.title = collapsed ? 'Expand widget' : 'Collapse widget'
+    })
+
     this.talkBtn.addEventListener('pointerdown', async (e) => {
       e.preventDefault()
       if (this.isHandsFree) {
