@@ -36,8 +36,8 @@ const PROVIDER_DEFS: Record<string, ProviderDef> = {
     url: 'wss://api.x.ai/v1/realtime',
     keyEnv: 'XAI_API_KEY',
     model: 'grok-3-fast',
-    voice: 'Sage',
-    voices: ['Sage', 'Ara', 'Rex', 'Sal', 'Eve', 'Leo'],
+    voice: 'Ara',
+    voices: ['Ara', 'Rex', 'Sal', 'Eve', 'Leo'],
     protocol: 'openai',
   },
 }

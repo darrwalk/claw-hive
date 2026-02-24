@@ -38,31 +38,42 @@ export class OpenAIRealtimeProvider implements VoiceProvider {
       })
     })
 
-    const sessionConfig: Record<string, unknown> = {
-      modalities: ['audio', 'text'],
-      instructions,
-      voice: this.config.voice,
-      input_audio_format: 'pcm16',
-      output_audio_format: 'pcm16',
-      input_audio_transcription: { model: 'whisper-1' },
-      turn_detection: vad
-        ? { type: 'server_vad', threshold: 0.5, prefix_padding_ms: 300, silence_duration_ms: 700 }
-        : null,
-    }
+    const isGrok = this.config.url.includes('x.ai')
 
-    if (tools.length > 0) {
-      sessionConfig.tools = tools.map((t) => ({
-        type: 'function',
-        name: t.function.name,
-        description: t.function.description || '',
-        parameters: t.function.parameters || {},
-      }))
-      sessionConfig.tool_choice = 'auto'
-    }
+    const toolsDef = tools.length > 0
+      ? tools.map((t) => ({
+          type: 'function' as const,
+          name: t.function.name,
+          description: t.function.description || '',
+          parameters: t.function.parameters || {},
+        }))
+      : undefined
 
-    if (this.config.url.includes('x.ai')) {
-      sessionConfig.model = this.config.model
-    }
+    const turnDetection = vad
+      ? { type: 'server_vad', threshold: 0.5, prefix_padding_ms: 300, silence_duration_ms: 700 }
+      : null
+
+    const sessionConfig: Record<string, unknown> = isGrok
+      ? {
+          instructions,
+          voice: this.config.voice,
+          turn_detection: turnDetection,
+          audio: {
+            input: { format: { type: 'audio/pcm', rate: 24000 } },
+            output: { format: { type: 'audio/pcm', rate: 24000 } },
+          },
+          ...(toolsDef && { tools: toolsDef, tool_choice: 'auto' }),
+        }
+      : {
+          modalities: ['audio', 'text'],
+          instructions,
+          voice: this.config.voice,
+          input_audio_format: 'pcm16',
+          output_audio_format: 'pcm16',
+          input_audio_transcription: { model: 'whisper-1' },
+          turn_detection: turnDetection,
+          ...(toolsDef && { tools: toolsDef, tool_choice: 'auto' }),
+        }
 
     this.ws.send(JSON.stringify({ type: 'session.update', session: sessionConfig }))
   }
