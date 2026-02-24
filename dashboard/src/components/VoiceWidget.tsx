@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 declare global {
   namespace JSX {
@@ -28,10 +28,15 @@ function getVoiceUrl(): string {
   return `${window.location.protocol}//${window.location.hostname}:${getVoicePort()}`
 }
 
+interface Position { x: number; y: number }
+
 export default function VoiceWidget() {
   const loaded = useRef(false)
   const [ready, setReady] = useState(false)
   const [voiceUrl, setVoiceUrl] = useState('')
+  const [pos, setPos] = useState<Position | null>(null)
+  const dragging = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (loaded.current) return
@@ -47,14 +52,69 @@ export default function VoiceWidget() {
     document.head.appendChild(script)
   }, [])
 
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    if (!containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    dragging.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: rect.left,
+      origY: rect.top,
+    }
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+  }, [])
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragging.current) return
+    const { startX, startY, origX, origY } = dragging.current
+    const newX = Math.max(0, Math.min(window.innerWidth - 320, origX + e.clientX - startX))
+    const newY = Math.max(0, Math.min(window.innerHeight - 60, origY + e.clientY - startY))
+    setPos({ x: newX, y: newY })
+  }, [])
+
+  const onPointerUp = useCallback(() => {
+    dragging.current = null
+  }, [])
+
   if (!ready || !voiceUrl) return null
 
   const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const wsUrl = `${wsProto}//${window.location.hostname}:${getVoicePort()}/ws`
 
+  const posStyle: React.CSSProperties = pos
+    ? { top: pos.y, left: pos.x, bottom: 'auto', right: 'auto' }
+    : {}
+
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-80 h-[480px]">
-      <claw-voice ws-url={wsUrl} theme="dark" />
+    <div
+      ref={containerRef}
+      className="fixed bottom-6 right-6 z-50 w-80 h-[480px]"
+      style={posStyle}
+    >
+      {/* Drag handle */}
+      <div
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        style={{
+          height: 14,
+          cursor: 'grab',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: '12px 12px 0 0',
+          background: '#1a1a24',
+          borderBottom: 'none',
+        }}
+      >
+        <div style={{
+          width: 40,
+          height: 4,
+          borderRadius: 2,
+          background: '#4a4a5a',
+        }} />
+      </div>
+      <claw-voice ws-url={wsUrl} theme="dark" style={{ height: 'calc(100% - 14px)' }} />
     </div>
   )
 }
