@@ -213,11 +213,22 @@ header h1 { font-size: 18px; font-weight: 600; }
 }
 .mode-toggle {
   font-size: 13px;
-  color: var(--text-dim);
+  color: var(--text);
   cursor: pointer;
   user-select: none;
-  background: none;
-  border: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 16px;
+  transition: all 0.2s;
+}
+.mode-toggle:hover {
+  border-color: var(--accent);
+}
+.mode-toggle.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
 }
 .hint {
   font-size: 12px;
@@ -466,6 +477,7 @@ export class ClawVoice extends HTMLElement {
   private updateModeUI(): void {
     if (!this.modeToggle) return
     this.modeToggle.textContent = `Mode: ${this.isHandsFree ? 'Hands-free (VAD)' : 'Push-to-talk'}`
+    this.modeToggle.classList.toggle('active', this.isHandsFree)
     this.hintEl.textContent = this.isHandsFree
       ? 'Tap button to start/stop — VAD detects speech'
       : 'Hold button or press Space to talk'
