@@ -435,19 +435,25 @@ export class ClawVoice extends HTMLElement {
       if (!this.isHandsFree && this.isRecording) this.stopRecording()
     })
 
-    this.modeToggle.addEventListener('click', () => {
+    this.modeToggle.addEventListener('click', async () => {
       this.isHandsFree = !this.isHandsFree
       this.updateModeUI()
       if (this.isRecording) this.stopRecording()
+      if (!this.audioInited) {
+        try { await this.initAudio() } catch { /* startRecording will retry */ }
+      }
       this.connectWs()
     })
 
-    this.providerSelect.addEventListener('change', () => {
+    this.providerSelect.addEventListener('change', async () => {
       this.currentProvider = this.providerSelect.value
       this.partialAssistant = ''
       if (this.currentProvider === 'gemini' && !this.isHandsFree) {
         this.isHandsFree = true
         this.updateModeUI()
+      }
+      if (this.isHandsFree && !this.audioInited) {
+        try { await this.initAudio() } catch { /* startRecording will retry */ }
       }
       this.connectWs()
     })
