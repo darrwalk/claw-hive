@@ -542,7 +542,10 @@ export class ClawVoice extends HTMLElement {
 
   private async initAudio(): Promise<void> {
     if (this.audioInited) return
-    this.audioInited = true
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error('Microphone requires HTTPS. Use https://claudia.taile65f04.ts.net:8443/')
+    }
 
     this.audioCtx = new AudioContext()
     this.micStream = await navigator.mediaDevices.getUserMedia({
@@ -566,6 +569,8 @@ export class ClawVoice extends HTMLElement {
       this.ws.send(JSON.stringify({ type: 'audio', data: b64 }))
     }
     source.connect(this.workletNode)
+
+    this.audioInited = true
   }
 
   private connectWs(): void {
