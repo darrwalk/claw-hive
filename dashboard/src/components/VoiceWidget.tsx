@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 declare global {
   namespace JSX {
@@ -15,23 +15,36 @@ declare global {
   }
 }
 
-const VOICE_URL = process.env.NEXT_PUBLIC_CLAW_VOICE_URL || ''
+const VOICE_PORT = 4200
+
+function getVoiceUrl(): string {
+  if (typeof window === 'undefined') return ''
+  return `${window.location.protocol}//${window.location.hostname}:${VOICE_PORT}`
+}
 
 export default function VoiceWidget() {
   const loaded = useRef(false)
+  const [ready, setReady] = useState(false)
+  const [voiceUrl, setVoiceUrl] = useState('')
 
   useEffect(() => {
-    if (loaded.current || !VOICE_URL) return
+    if (loaded.current) return
     loaded.current = true
 
+    const url = getVoiceUrl()
+    if (!url) return
+    setVoiceUrl(url)
+
     const script = document.createElement('script')
-    script.src = `${VOICE_URL}/dist/claw-voice.js`
+    script.src = `${url}/dist/claw-voice.js`
+    script.onload = () => setReady(true)
     document.head.appendChild(script)
   }, [])
 
-  if (!VOICE_URL) return null
+  if (!ready || !voiceUrl) return null
 
-  const wsUrl = VOICE_URL.replace(/^http/, 'ws') + '/ws'
+  const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const wsUrl = `${wsProto}//${window.location.hostname}:${VOICE_PORT}/ws`
 
   return (
     <div className="fixed bottom-6 right-6 z-50 w-80 h-[480px]">
