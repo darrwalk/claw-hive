@@ -436,12 +436,15 @@ export class ClawVoice extends HTMLElement {
     })
 
     this.modeToggle.addEventListener('click', async () => {
+      console.log('[claw-voice] mode toggle clicked, isHandsFree was:', this.isHandsFree)
       this.isHandsFree = !this.isHandsFree
       this.updateModeUI()
       if (this.isRecording) this.stopRecording()
       if (!this.audioInited) {
-        try { await this.initAudio() } catch { /* startRecording will retry */ }
+        console.log('[claw-voice] initAudio from mode toggle (user gesture)')
+        try { await this.initAudio() } catch (err) { console.error('[claw-voice] initAudio failed:', err) }
       }
+      console.log('[claw-voice] audioInited:', this.audioInited, 'calling connectWs')
       this.connectWs()
     })
 
@@ -553,8 +556,10 @@ export class ClawVoice extends HTMLElement {
     URL.revokeObjectURL(url)
 
     this.workletNode = new AudioWorkletNode(this.audioCtx, 'pcm-capture')
+    let audioMsgCount = 0
     this.workletNode.port.onmessage = (e: MessageEvent<Float32Array>) => {
       if (!this.isRecording || !this.ws || this.ws.readyState !== WebSocket.OPEN) return
+      if (audioMsgCount++ < 3) console.log('[claw-voice] sending audio frame', audioMsgCount, 'wsState:', this.ws.readyState)
       const targetRate = this.currentProvider === 'gemini' ? SAMPLE_RATE_GEMINI_IN : SAMPLE_RATE_OPENAI
       const resampled = resample(e.data, this.audioCtx!.sampleRate, targetRate)
       const b64 = float32ToPcm16B64(resampled)
@@ -575,11 +580,17 @@ export class ClawVoice extends HTMLElement {
 
     this.ws.onmessage = async (e) => {
       const msg = JSON.parse(e.data)
+      console.log('[claw-voice] WS msg:', msg.type, msg.type === 'audio' ? `(${msg.data?.length} chars)` : '')
       switch (msg.type) {
         case 'connected':
+          console.log('[claw-voice] WS connected, provider:', msg.provider, 'isHandsFree:', this.isHandsFree)
           this.setStatus('connected', `Connected — ${msg.provider}`)
           this.emit('voice-connected', { provider: msg.provider })
-          if (this.isHandsFree) await this.startRecording()
+          if (this.isHandsFree) {
+            console.log('[claw-voice] auto-starting recording for hands-free')
+            await this.startRecording()
+            console.log('[claw-voice] after startRecording, isRecording:', this.isRecording)
+          }
           break
         case 'audio':
           this.queueAudio(msg.data)
@@ -684,19 +695,23 @@ export class ClawVoice extends HTMLElement {
   }
 
   private async startRecording(): Promise<void> {
+    console.log('[claw-voice] startRecording called, isRecording:', this.isRecording, 'audioInited:', this.audioInited)
     if (this.isRecording) return
 
     if (!this.audioInited) {
       try {
+        console.log('[claw-voice] initAudio from startRecording')
         await this.initAudio()
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error'
+        console.error('[claw-voice] initAudio failed in startRecording:', msg)
         this.addMessage(`Microphone access failed: ${msg}`, 'system')
         return
       }
     }
 
     this.isRecording = true
+    console.log('[claw-voice] recording started, workletNode:', !!this.workletNode, 'ws:', this.ws?.readyState)
     this.playbackQueue = []
     this.isSpeaking = false
     this.isPlaying = false
