@@ -407,12 +407,12 @@ export class ClawVoice extends HTMLElement {
   }
 
   private bindEvents(): void {
-    this.talkBtn.addEventListener('pointerdown', (e) => {
+    this.talkBtn.addEventListener('pointerdown', async (e) => {
       e.preventDefault()
       if (this.isHandsFree) {
-        this.isRecording ? this.stopRecording() : this.startRecording()
+        this.isRecording ? this.stopRecording() : await this.startRecording()
       } else {
-        this.startRecording()
+        await this.startRecording()
       }
     })
     this.talkBtn.addEventListener('pointerup', (e) => {
@@ -434,17 +434,21 @@ export class ClawVoice extends HTMLElement {
     this.providerSelect.addEventListener('change', () => {
       this.currentProvider = this.providerSelect.value
       this.partialAssistant = ''
+      if (this.currentProvider === 'gemini' && !this.isHandsFree) {
+        this.isHandsFree = true
+        this.updateModeUI()
+      }
       this.connectWs()
     })
 
-    const onKeyDown = (e: KeyboardEvent) => {
+    const onKeyDown = async (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName
       if (e.code === 'Space' && !e.repeat && tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
         e.preventDefault()
         if (this.isHandsFree) {
-          this.isRecording ? this.stopRecording() : this.startRecording()
+          this.isRecording ? this.stopRecording() : await this.startRecording()
         } else {
-          this.startRecording()
+          await this.startRecording()
         }
       }
     }
@@ -474,7 +478,6 @@ export class ClawVoice extends HTMLElement {
     this.updateModeUI()
 
     await this.loadProviders()
-    await this.initAudio()
     this.connectWs()
     this.addMessage('Tap the mic button or hold Space to talk.', 'system')
   }
@@ -552,13 +555,13 @@ export class ClawVoice extends HTMLElement {
 
     this.ws.onopen = () => this.setStatus('', 'Authenticating...')
 
-    this.ws.onmessage = (e) => {
+    this.ws.onmessage = async (e) => {
       const msg = JSON.parse(e.data)
       switch (msg.type) {
         case 'connected':
           this.setStatus('connected', `Connected — ${msg.provider}`)
           this.emit('voice-connected', { provider: msg.provider })
-          if (this.isHandsFree) this.startRecording()
+          if (this.isHandsFree) await this.startRecording()
           break
         case 'audio':
           this.queueAudio(msg.data)
@@ -662,8 +665,19 @@ export class ClawVoice extends HTMLElement {
     this.talkBtn.appendChild(recording ? createMicOffIcon() : createMicIcon())
   }
 
-  private startRecording(): void {
+  private async startRecording(): Promise<void> {
     if (this.isRecording) return
+
+    if (!this.audioInited) {
+      try {
+        await this.initAudio()
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown error'
+        this.addMessage(`Microphone access failed: ${msg}`, 'system')
+        return
+      }
+    }
+
     this.isRecording = true
     this.playbackQueue = []
     this.isSpeaking = false
