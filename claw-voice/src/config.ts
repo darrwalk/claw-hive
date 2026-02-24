@@ -11,30 +11,34 @@ interface ProviderDef {
   keyEnv: string
   model: string
   voice: string
+  voices: string[]
   protocol: 'openai' | 'gemini'
 }
 
 const PROVIDER_DEFS: Record<string, ProviderDef> = {
-  grok: {
-    url: 'wss://api.x.ai/v1/realtime',
-    keyEnv: 'XAI_API_KEY',
-    model: 'grok-3-fast',
-    voice: 'Sage',
-    protocol: 'openai',
+  gemini: {
+    url: 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent',
+    keyEnv: 'GOOGLE_API_KEY',
+    model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+    voice: 'Kore',
+    voices: ['Kore', 'Puck', 'Charon', 'Zephyr', 'Fenrir', 'Aoede'],
+    protocol: 'gemini',
   },
   openai: {
     url: 'wss://api.openai.com/v1/realtime',
     keyEnv: 'OPENAI_API_KEY',
     model: 'gpt-4o-realtime-preview',
     voice: 'sage',
+    voices: ['sage', 'alloy', 'echo', 'shimmer', 'verse', 'marin', 'cedar'],
     protocol: 'openai',
   },
-  gemini: {
-    url: 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent',
-    keyEnv: 'GOOGLE_API_KEY',
-    model: 'gemini-2.5-flash-native-audio-preview-12-2025',
-    voice: 'Kore',
-    protocol: 'gemini',
+  grok: {
+    url: 'wss://api.x.ai/v1/realtime',
+    keyEnv: 'XAI_API_KEY',
+    model: 'grok-3-fast',
+    voice: 'Sage',
+    voices: ['Sage', 'Ara', 'Rex', 'Sal', 'Eve', 'Leo'],
+    protocol: 'openai',
   },
 }
 
@@ -52,10 +56,11 @@ export function getProvider(name: string): ProviderConfig {
   }
 }
 
-export function availableProviders(): { name: string; available: boolean; protocol: string }[] {
+export function availableProviders(): { name: string; available: boolean; protocol: string; voices: string[] }[] {
   return Object.entries(PROVIDER_DEFS).map(([name, def]) => ({
     name,
     available: !!process.env[def.keyEnv],
     protocol: def.protocol,
+    voices: def.voices,
   }))
 }

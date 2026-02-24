@@ -7,8 +7,9 @@ import type { VoiceProvider } from './providers/base.js'
 import { OpenAIRealtimeProvider } from './providers/openai-realtime.js'
 import { GeminiLiveProvider } from './providers/gemini-live.js'
 
-function createProvider(name: string): VoiceProvider {
+function createProvider(name: string, voice: string): VoiceProvider {
   const cfg = getProvider(name)
+  if (voice) cfg.voice = voice
   if (cfg.protocol === 'gemini') return new GeminiLiveProvider(cfg)
   return new OpenAIRealtimeProvider(cfg)
 }
@@ -17,9 +18,10 @@ export async function handleVoiceSocket(
   ws: WebSocket,
   providerName: string,
   vad: boolean,
+  voice: string,
   toolRegistry: ToolRegistry,
 ): Promise<void> {
-  console.log(`[voice] Browser connected, provider=${providerName} vad=${vad}`)
+  console.log(`[voice] Browser connected, provider=${providerName} vad=${vad} voice=${voice || '(default)'}`)
 
   const startTime = new Date()
   const log: LogEntry[] = []
@@ -27,7 +29,7 @@ export async function handleVoiceSocket(
 
   let voiceProvider: VoiceProvider
   try {
-    voiceProvider = createProvider(providerName)
+    voiceProvider = createProvider(providerName, voice)
   } catch {
     ws.send(JSON.stringify({ type: 'error', message: `Unknown provider: ${providerName}` }))
     ws.close()

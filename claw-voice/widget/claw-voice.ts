@@ -59,7 +59,16 @@ interface TranscriptEntry {
 interface ProviderInfo {
   name: string
   available: boolean
+  voices?: string[]
 }
+
+interface VoicePrefs {
+  provider: string
+  voices: Record<string, string>
+  mode: 'push-to-talk' | 'hands-free'
+}
+
+const PREFS_KEY = 'claw-voice-prefs'
 
 const STYLES = `
 :host {
@@ -235,28 +244,67 @@ header h1 { font-size: 18px; font-weight: 600; }
   font-size: 12px;
   color: var(--text-dim);
 }
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.collapse-btn {
+.minimize-btn {
   background: none;
   border: none;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 18px;
+  font-size: 20px;
   padding: 4px 8px;
   line-height: 1;
 }
-.collapse-btn:hover { color: var(--text); }
-:host(.collapsed) .transcript,
-:host(.collapsed) .controls {
+.minimize-btn:hover { color: var(--text); }
+.settings-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+}
+.settings-btn:hover { color: var(--text); }
+.settings-row {
   display: none;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
-:host(.collapsed) .container {
-  height: auto;
+.settings-row.open { display: flex; }
+.settings-row label { font-size: 13px; color: var(--text-dim); white-space: nowrap; }
+.settings-row select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+  flex: 1;
+  cursor: pointer;
 }
+.fab {
+  display: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  border: none;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.fab:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 24px var(--accent-glow);
+}
+.fab:active { transform: scale(0.95); }
+:host(.collapsed) .container { display: none; }
+:host(.collapsed) .fab { display: flex; }
+:host(.collapsed) { width: 56px !important; height: 56px !important; }
 `
 
 function createMicIcon(): SVGSVGElement {
@@ -337,15 +385,28 @@ function buildDOM(shadow: ShadowRoot): Record<string, HTMLElement> {
   const providerSelect = document.createElement('select')
   providerSelect.className = 'provider-select'
   providerSelect.id = 'providerSelect'
-  const collapseBtn = document.createElement('button')
-  collapseBtn.className = 'collapse-btn'
-  collapseBtn.id = 'collapseBtn'
-  collapseBtn.textContent = '▼'
-  collapseBtn.title = 'Collapse widget'
-  const headerRight = document.createElement('div')
-  headerRight.className = 'header-right'
-  headerRight.append(providerSelect, collapseBtn)
-  header.append(headerLeft, headerRight)
+  const settingsBtn = document.createElement('button')
+  settingsBtn.className = 'settings-btn'
+  settingsBtn.id = 'settingsBtn'
+  settingsBtn.textContent = '⚙'
+  settingsBtn.title = 'Voice settings'
+  const minimizeBtn = document.createElement('button')
+  minimizeBtn.className = 'minimize-btn'
+  minimizeBtn.id = 'minimizeBtn'
+  minimizeBtn.textContent = '−'
+  minimizeBtn.title = 'Minimize to mic button'
+  header.append(headerLeft, providerSelect, settingsBtn, minimizeBtn)
+
+  // Settings row
+  const settingsRow = document.createElement('div')
+  settingsRow.className = 'settings-row'
+  settingsRow.id = 'settingsRow'
+  const voiceLabel = document.createElement('label')
+  voiceLabel.textContent = 'Voice'
+  const voiceSelect = document.createElement('select')
+  voiceSelect.className = 'voice-select'
+  voiceSelect.id = 'voiceSelect'
+  settingsRow.append(voiceLabel, voiceSelect)
 
   // Transcript
   const transcript = document.createElement('div')
@@ -369,11 +430,19 @@ function buildDOM(shadow: ShadowRoot): Record<string, HTMLElement> {
   hint.textContent = 'Hold button or press Space to talk'
   controls.append(talkBtn, modeToggle, hint)
 
-  container.append(header, transcript, controls)
-  shadow.append(style, container)
+  container.append(header, settingsRow, transcript, controls)
+
+  const fab = document.createElement('button')
+  fab.className = 'fab'
+  fab.id = 'fab'
+  fab.title = 'Open voice widget'
+  fab.appendChild(createMicIcon())
+
+  shadow.append(style, container, fab)
 
   return {
-    transcript, talkBtn, statusDot, statusText, providerSelect, modeToggle, hint, collapseBtn,
+    transcript, talkBtn, statusDot, statusText, providerSelect, modeToggle, hint,
+    minimizeBtn, fab, settingsBtn, settingsRow, voiceSelect,
   }
 }
 
@@ -386,11 +455,13 @@ export class ClawVoice extends HTMLElement {
   private playbackQueue: Int16Array[] = []
   private isPlaying = false
   private isRecording = false
-  private isHandsFree = false
+  private isHandsFree = true
   private isSpeaking = false
   private partialAssistant = ''
-  private currentProvider = 'grok'
+  private currentProvider = 'gemini'
+  private currentVoice = ''
   private providers: ProviderInfo[] = []
+  private providerVoices: Record<string, string[]> = {}
   private transcript: TranscriptEntry[] = []
   private audioInited = false
   private processingTimeout: ReturnType<typeof setTimeout> | null = null
@@ -403,7 +474,11 @@ export class ClawVoice extends HTMLElement {
   private providerSelect!: HTMLSelectElement
   private modeToggle!: HTMLElement
   private hintEl!: HTMLElement
-  private collapseBtn!: HTMLElement
+  private minimizeBtn!: HTMLElement
+  private fab!: HTMLElement
+  private settingsBtn!: HTMLElement
+  private settingsRow!: HTMLElement
+  private voiceSelect!: HTMLSelectElement
 
   static get observedAttributes(): string[] {
     return ['ws-url', 'provider', 'theme', 'mode']
@@ -423,7 +498,11 @@ export class ClawVoice extends HTMLElement {
     this.providerSelect = els.providerSelect as HTMLSelectElement
     this.modeToggle = els.modeToggle
     this.hintEl = els.hint
-    this.collapseBtn = els.collapseBtn
+    this.minimizeBtn = els.minimizeBtn
+    this.fab = els.fab
+    this.settingsBtn = els.settingsBtn
+    this.settingsRow = els.settingsRow
+    this.voiceSelect = els.voiceSelect as HTMLSelectElement
     this.bindEvents()
     this.init()
   }
@@ -451,10 +530,23 @@ export class ClawVoice extends HTMLElement {
   }
 
   private bindEvents(): void {
-    this.collapseBtn.addEventListener('click', () => {
-      const collapsed = this.classList.toggle('collapsed')
-      this.collapseBtn.textContent = collapsed ? '▲' : '▼'
-      this.collapseBtn.title = collapsed ? 'Expand widget' : 'Collapse widget'
+    this.minimizeBtn.addEventListener('click', () => {
+      this.classList.add('collapsed')
+      this.emit('voice-collapsed', { collapsed: true })
+    })
+    this.fab.addEventListener('click', () => {
+      this.classList.remove('collapsed')
+      this.emit('voice-collapsed', { collapsed: false })
+    })
+
+    this.settingsBtn.addEventListener('click', () => {
+      this.settingsRow.classList.toggle('open')
+    })
+
+    this.voiceSelect.addEventListener('change', () => {
+      this.currentVoice = this.voiceSelect.value
+      this.savePrefs()
+      this.connectWs()
     })
 
     this.talkBtn.addEventListener('pointerdown', async (e) => {
@@ -478,6 +570,7 @@ export class ClawVoice extends HTMLElement {
       console.log('[claw-voice] mode toggle clicked, isHandsFree was:', this.isHandsFree)
       this.isHandsFree = !this.isHandsFree
       this.updateModeUI()
+      this.savePrefs()
       if (this.isRecording) this.stopRecording()
       if (!this.audioInited) {
         console.log('[claw-voice] initAudio from mode toggle (user gesture)')
@@ -490,9 +583,12 @@ export class ClawVoice extends HTMLElement {
     this.providerSelect.addEventListener('change', async () => {
       this.currentProvider = this.providerSelect.value
       this.partialAssistant = ''
+      this.populateVoiceSelect()
+      this.savePrefs()
       if (this.currentProvider === 'gemini' && !this.isHandsFree) {
         this.isHandsFree = true
         this.updateModeUI()
+        this.savePrefs()
       }
       if (this.isHandsFree && !this.audioInited) {
         try { await this.initAudio() } catch { /* startRecording will retry */ }
@@ -532,12 +628,15 @@ export class ClawVoice extends HTMLElement {
   }
 
   private async init(): Promise<void> {
+    this.loadPrefs()
     const initialProvider = this.getAttribute('provider')
     if (initialProvider) this.currentProvider = initialProvider
-    if (this.getAttribute('mode') === 'hands-free') this.isHandsFree = true
+    const initialMode = this.getAttribute('mode')
+    if (initialMode === 'hands-free') this.isHandsFree = true
     this.updateModeUI()
 
     await this.loadProviders()
+    this.populateVoiceSelect()
     this.connectWs()
     this.addMessage('Tap the mic button or hold Space to talk.', 'system')
   }
@@ -557,6 +656,9 @@ export class ClawVoice extends HTMLElement {
       const res = await fetch(configUrl)
       const data = await res.json()
       this.providers = (data.providers as ProviderInfo[]).filter(p => p.available)
+      for (const p of this.providers) {
+        if (p.voices) this.providerVoices[p.name] = p.voices
+      }
 
       while (this.providerSelect.firstChild) this.providerSelect.removeChild(this.providerSelect.firstChild)
       for (const p of this.providers) {
@@ -570,7 +672,7 @@ export class ClawVoice extends HTMLElement {
       }
       this.providerSelect.value = this.currentProvider
     } catch {
-      for (const name of ['grok', 'openai', 'gemini']) {
+      for (const name of ['gemini', 'openai', 'grok']) {
         const opt = document.createElement('option')
         opt.value = name
         opt.textContent = `${name} (${PROVIDER_COSTS[name] || ''})`
@@ -615,7 +717,8 @@ export class ClawVoice extends HTMLElement {
   private connectWs(): void {
     if (this.ws) this.ws.close()
 
-    const url = `${this.wsUrl}?provider=${this.currentProvider}&vad=${this.isHandsFree}`
+    const voiceParam = this.currentVoice ? `&voice=${encodeURIComponent(this.currentVoice)}` : ''
+    const url = `${this.wsUrl}?provider=${this.currentProvider}&vad=${this.isHandsFree}${voiceParam}`
     this.setStatus('', 'Connecting...')
 
     this.ws = new WebSocket(url)
@@ -798,6 +901,57 @@ export class ClawVoice extends HTMLElement {
 
   private emit(name: string, detail: Record<string, unknown>): void {
     this.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }))
+  }
+
+  private loadPrefs(): void {
+    try {
+      const raw = localStorage.getItem(PREFS_KEY)
+      if (!raw) return
+      const prefs: VoicePrefs = JSON.parse(raw)
+      if (prefs.provider) this.currentProvider = prefs.provider
+      if (prefs.mode) this.isHandsFree = prefs.mode === 'hands-free'
+      if (prefs.voices?.[this.currentProvider]) {
+        this.currentVoice = prefs.voices[this.currentProvider]
+      }
+    } catch { /* ignore corrupt prefs */ }
+  }
+
+  private savePrefs(): void {
+    const existing = this.readPrefsRaw()
+    const voices = existing.voices || {}
+    voices[this.currentProvider] = this.currentVoice
+    const prefs: VoicePrefs = {
+      provider: this.currentProvider,
+      voices,
+      mode: this.isHandsFree ? 'hands-free' : 'push-to-talk',
+    }
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
+  }
+
+  private readPrefsRaw(): Partial<VoicePrefs> {
+    try {
+      const raw = localStorage.getItem(PREFS_KEY)
+      return raw ? JSON.parse(raw) : {}
+    } catch { return {} }
+  }
+
+  private populateVoiceSelect(): void {
+    while (this.voiceSelect.firstChild) this.voiceSelect.removeChild(this.voiceSelect.firstChild)
+    const voices = this.providerVoices[this.currentProvider] || []
+    for (const v of voices) {
+      const opt = document.createElement('option')
+      opt.value = v
+      opt.textContent = v
+      this.voiceSelect.appendChild(opt)
+    }
+    // Restore saved voice for this provider, or default to first
+    const saved = this.readPrefsRaw().voices?.[this.currentProvider]
+    if (saved && voices.includes(saved)) {
+      this.currentVoice = saved
+    } else {
+      this.currentVoice = voices[0] || ''
+    }
+    this.voiceSelect.value = this.currentVoice
   }
 
   private cleanup(): void {

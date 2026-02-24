@@ -34,9 +34,11 @@ export default function VoiceWidget() {
   const loaded = useRef(false)
   const [ready, setReady] = useState(false)
   const [voiceUrl, setVoiceUrl] = useState('')
+  const [collapsed, setCollapsed] = useState(false)
   const [pos, setPos] = useState<Position | null>(null)
   const dragging = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const voiceRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     if (loaded.current) return
@@ -51,6 +53,17 @@ export default function VoiceWidget() {
     script.onload = () => setReady(true)
     document.head.appendChild(script)
   }, [])
+
+  useEffect(() => {
+    const el = voiceRef.current
+    if (!el) return
+    const handler = (e: Event) => {
+      const { collapsed: c } = (e as CustomEvent).detail
+      setCollapsed(c)
+    }
+    el.addEventListener('voice-collapsed', handler)
+    return () => el.removeEventListener('voice-collapsed', handler)
+  }, [ready])
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (!containerRef.current) return
@@ -88,33 +101,39 @@ export default function VoiceWidget() {
   return (
     <div
       ref={containerRef}
-      className="fixed bottom-6 right-6 z-50 w-80 h-[480px]"
+      className={`fixed bottom-6 right-6 z-50 ${collapsed ? '' : 'w-80 h-[480px]'}`}
       style={posStyle}
     >
-      {/* Drag handle */}
-      <div
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        style={{
-          height: 14,
-          cursor: 'grab',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: '12px 12px 0 0',
-          background: '#1a1a24',
-          borderBottom: 'none',
-        }}
-      >
-        <div style={{
-          width: 40,
-          height: 4,
-          borderRadius: 2,
-          background: '#4a4a5a',
-        }} />
-      </div>
-      <claw-voice ws-url={wsUrl} theme="dark" style={{ height: 'calc(100% - 14px)' }} />
+      {!collapsed && (
+        <div
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          style={{
+            height: 14,
+            cursor: 'grab',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '12px 12px 0 0',
+            background: '#1a1a24',
+            borderBottom: 'none',
+          }}
+        >
+          <div style={{
+            width: 40,
+            height: 4,
+            borderRadius: 2,
+            background: '#4a4a5a',
+          }} />
+        </div>
+      )}
+      <claw-voice
+        ref={voiceRef}
+        ws-url={wsUrl}
+        theme="dark"
+        style={{ height: collapsed ? undefined : 'calc(100% - 14px)' }}
+      />
     </div>
   )
 }
