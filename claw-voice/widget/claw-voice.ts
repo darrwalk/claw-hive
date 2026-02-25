@@ -19,10 +19,15 @@ function resample(float32: Float32Array, fromRate: number, toRate: number): Floa
   const out = new Float32Array(len)
   for (let i = 0; i < len; i++) {
     const idx = i * ratio
-    const lo = Math.floor(idx)
-    const hi = Math.min(lo + 1, float32.length - 1)
-    const frac = idx - lo
-    out[i] = float32[lo] * (1 - frac) + float32[hi] * frac
+    const i0 = Math.floor(idx)
+    const frac = idx - i0
+    // Cubic Hermite interpolation (4-point)
+    const im1 = Math.max(i0 - 1, 0)
+    const i1 = Math.min(i0 + 1, float32.length - 1)
+    const i2 = Math.min(i0 + 2, float32.length - 1)
+    const a = float32[im1], b = float32[i0], c = float32[i1], d = float32[i2]
+    const t = frac
+    out[i] = b + 0.5 * t * (c - a + t * (2 * a - 5 * b + 4 * c - d + t * (3 * (b - c) + d - a)))
   }
   return out
 }
