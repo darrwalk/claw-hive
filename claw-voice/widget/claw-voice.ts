@@ -493,6 +493,7 @@ export class ClawVoice extends HTMLElement {
   private nextPlayTime = 0
   private playbackGain: GainNode | null = null
   private activeSource: AudioBufferSourceNode | null = null
+  private playbackGen = 0
   private partialAssistant = ''
   private currentProvider = 'gemini'
   private currentVoice = ''
@@ -950,12 +951,14 @@ export class ClawVoice extends HTMLElement {
     const startAt = Math.max(now, this.nextPlayTime)
     this.nextPlayTime = startAt + audioBuf.duration
 
-    source.onended = () => this.playNext()
+    const gen = this.playbackGen
+    source.onended = () => { if (this.playbackGen === gen) this.playNext() }
     source.start(startAt)
     this.activeSource = source
   }
 
   private bargeIn(): void {
+    this.playbackGen++
     if (!this.audioCtx || !this.isPlaying) return
     // Smooth fade-out instead of hard cut
     if (this.playbackGain) {
