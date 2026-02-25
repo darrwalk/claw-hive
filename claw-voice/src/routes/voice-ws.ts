@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { handleVoiceSocket } from '../handler.js'
 import type { ToolRegistry } from '../tools/index.js'
 
-const WS_TOKEN = process.env.WS_TOKEN || process.env.GATEWAY_TOKEN
+const WS_TOKEN = process.env.WS_TOKEN
 
 export async function voiceWsRoutes(app: FastifyInstance, toolRegistry: ToolRegistry): Promise<void> {
   app.get('/ws', { websocket: true }, (socket, request) => {
