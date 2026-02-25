@@ -946,14 +946,9 @@ export class ClawVoice extends HTMLElement {
     source.buffer = audioBuf
     source.connect(gain)
 
-    // Pre-schedule for gapless playback
-    const now = this.audioCtx.currentTime
-    const startAt = Math.max(now, this.nextPlayTime)
-    this.nextPlayTime = startAt + audioBuf.duration
-
     const gen = this.playbackGen
     source.onended = () => { if (this.playbackGen === gen) this.playNext() }
-    source.start(startAt)
+    source.start()
     this.activeSource = source
   }
 
