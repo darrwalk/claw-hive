@@ -803,8 +803,11 @@ export class ClawVoice extends HTMLElement {
         this.handleAudioChunk(out, rms)
       }
       source.connect(this.scriptNode)
-      // ScriptProcessorNode requires connection to destination to fire events
-      this.scriptNode.connect(this.audioCtx.destination)
+      // ScriptProcessorNode needs destination connection to fire events — use silent gain
+      const silentGain = this.audioCtx.createGain()
+      silentGain.gain.value = 0
+      silentGain.connect(this.audioCtx.destination)
+      this.scriptNode.connect(silentGain)
     }
 
     this.audioInited = true
