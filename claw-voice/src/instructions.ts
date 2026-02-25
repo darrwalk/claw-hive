@@ -29,8 +29,8 @@ async function latestStateOfArnd(memoryDir: string): Promise<string | null> {
 }
 
 const VOICE_LOGS_DIR = 'memory/voice-logs'
-const MAX_TRANSCRIPT_FILES = 20
-const MAX_TRANSCRIPT_CHARS = 30_000
+const MAX_TRANSCRIPT_FILES = 5
+const MAX_TRANSCRIPT_CHARS = 8_000
 
 async function recentTranscripts(voiceLogsDir: string): Promise<string | null> {
   try {
@@ -56,7 +56,7 @@ async function recentTranscripts(voiceLogsDir: string): Promise<string | null> {
 
     return `# Recent Voice Conversations
 
-These are your recent voice sessions with Arnd. Use them for conversational continuity — reference past topics naturally.
+These are your recent voice sessions with Arnd for background context only. Do NOT proactively bring up past topics — only reference them if the user does first.
 
 ${parts.join('\n\n---\n\n')}`
   } catch {
