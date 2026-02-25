@@ -1,11 +1,15 @@
 import WebSocket from 'ws'
 import type { ProviderConfig } from '../config.js'
 import type { ProviderEvent, ToolDef, VoiceProvider } from './base.js'
+import { iterateWsMessages } from './ws-iter.js'
+
+const SESSION_WARN_MS = 13 * 60 * 1000
 
 export class OpenAIRealtimeProvider implements VoiceProvider {
   private ws: WebSocket | null = null
   private vad = false
   private config: ProviderConfig
+  private sessionStart = 0
 
   constructor(config: ProviderConfig) {
     this.config = config
@@ -26,17 +30,22 @@ export class OpenAIRealtimeProvider implements VoiceProvider {
 
     this.ws = new WebSocket(url, { headers })
 
-    await new Promise<void>((resolve, reject) => {
-      this.ws!.once('error', reject)
-      this.ws!.once('message', (raw) => {
-        const msg = JSON.parse(raw.toString())
-        if (msg.type === 'error') {
-          reject(new Error(`Provider rejected session: ${msg.error?.message || JSON.stringify(msg)}`))
-          return
-        }
-        resolve()
-      })
-    })
+    await Promise.race([
+      new Promise<void>((resolve, reject) => {
+        this.ws!.once('error', reject)
+        this.ws!.once('message', (raw) => {
+          const msg = JSON.parse(raw.toString())
+          if (msg.type === 'error') {
+            reject(new Error(`Provider rejected session: ${msg.error?.message || JSON.stringify(msg)}`))
+            return
+          }
+          resolve()
+        })
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('OpenAI session handshake timed out (10s)')), 10_000),
+      ),
+    ])
 
     const isGrok = this.config.url.includes('x.ai')
 
@@ -76,6 +85,7 @@ export class OpenAIRealtimeProvider implements VoiceProvider {
         }
 
     this.ws.send(JSON.stringify({ type: 'session.update', session: sessionConfig }))
+    this.sessionStart = Date.now()
   }
 
   async sendText(text: string): Promise<void> {
@@ -104,8 +114,12 @@ export class OpenAIRealtimeProvider implements VoiceProvider {
   async *receive(): AsyncGenerator<ProviderEvent> {
     if (!this.ws) return
 
-    const messages = this.iterateMessages()
-    for await (const raw of messages) {
+    for await (const raw of iterateWsMessages(this.ws)) {
+      if (this.sessionStart && Date.now() - this.sessionStart > SESSION_WARN_MS) {
+        yield { kind: 'reconnect', reason: 'OpenAI 15-min session limit approaching' }
+        return
+      }
+
       const msg = JSON.parse(raw)
       const t = msg.type || ''
 
@@ -148,40 +162,4 @@ export class OpenAIRealtimeProvider implements VoiceProvider {
     }
   }
 
-  private async *iterateMessages(): AsyncGenerator<string> {
-    const ws = this.ws!
-    const queue: string[] = []
-    let resolve: (() => void) | null = null
-    let done = false
-
-    const onMessage = (data: WebSocket.Data) => {
-      queue.push(data.toString())
-      resolve?.()
-    }
-    const onClose = () => {
-      done = true
-      resolve?.()
-    }
-    const onError = () => {
-      done = true
-      resolve?.()
-    }
-
-    ws.on('message', onMessage)
-    ws.on('close', onClose)
-    ws.on('error', onError)
-
-    try {
-      while (true) {
-        while (queue.length > 0) yield queue.shift()!
-        if (done) return
-        await new Promise<void>((r) => { resolve = r })
-        resolve = null
-      }
-    } finally {
-      ws.off('message', onMessage)
-      ws.off('close', onClose)
-      ws.off('error', onError)
-    }
-  }
 }

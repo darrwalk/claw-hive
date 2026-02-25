@@ -22,7 +22,12 @@ export interface ErrorEvent {
   message: string
 }
 
-export type ProviderEvent = AudioEvent | TranscriptEvent | ToolCallEvent | ErrorEvent
+export interface ReconnectEvent {
+  kind: 'reconnect'
+  reason: string
+}
+
+export type ProviderEvent = AudioEvent | TranscriptEvent | ToolCallEvent | ErrorEvent | ReconnectEvent
 
 export interface ToolDef {
   type: 'function'

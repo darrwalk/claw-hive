@@ -27,7 +27,12 @@ export class ToolRegistry {
       return `Error: invalid JSON arguments: ${argumentsJson}`
     }
 
-    return registration.handler(args)
+    return Promise.race([
+      registration.handler(args),
+      new Promise<string>((resolve) =>
+        setTimeout(() => resolve(`Tool '${name}' timed out after 30s`), 30_000),
+      ),
+    ])
   }
 }
 

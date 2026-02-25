@@ -40,16 +40,41 @@ function float32ToPcm16B64(float32: Float32Array): string {
   return btoa(binary)
 }
 
-const WORKLET_CODE = [
-  'class PcmCapture extends AudioWorkletProcessor {',
-  '  process(inputs) {',
-  '    const input = inputs[0];',
-  '    if (input.length > 0) this.port.postMessage(input[0]);',
-  '    return true;',
-  '  }',
-  '}',
-  "registerProcessor('pcm-capture', PcmCapture);",
-].join('\n')
+const WORKLET_CODE = `
+class PcmCapture extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.envelope = 0;
+  }
+  process(inputs) {
+    const input = inputs[0];
+    if (input.length === 0) return true;
+    const raw = input[0];
+    const out = new Float32Array(raw.length);
+    let sumSq = 0;
+
+    // Soft limiter: exponential envelope follower
+    const attack = 0.002;
+    const release = 0.01;
+    const threshold = 0.8;
+    let env = this.envelope;
+
+    for (let i = 0; i < raw.length; i++) {
+      const abs = Math.abs(raw[i]);
+      env = abs > env ? env + attack * (abs - env) : env + release * (env > 0 ? -env : 0);
+      const gain = env > threshold ? threshold / env : 1.0;
+      out[i] = raw[i] * gain;
+      sumSq += out[i] * out[i];
+    }
+    this.envelope = env;
+
+    const rms = Math.sqrt(sumSq / raw.length);
+    this.port.postMessage({ audio: out, rms });
+    return true;
+  }
+}
+registerProcessor('pcm-capture', PcmCapture);
+`
 
 interface TranscriptEntry {
   role: 'user' | 'assistant' | 'system' | 'tool'
@@ -211,11 +236,12 @@ header h1 { font-size: 18px; font-weight: 600; }
   touch-action: none;
 }
 .talk-btn:hover { border-color: var(--accent); }
+.talk-btn { --mic-level: 0; }
 .talk-btn.active {
   background: var(--red);
   border-color: var(--red);
-  transform: scale(1.1);
-  box-shadow: 0 0 30px rgba(224, 85, 85, 0.4);
+  transform: scale(calc(1.05 + var(--mic-level) * 0.1));
+  box-shadow: 0 0 calc(15px + var(--mic-level) * 30px) rgba(224, 85, 85, calc(0.3 + var(--mic-level) * 0.4));
 }
 .talk-btn.speaking {
   border-color: var(--accent);
@@ -453,6 +479,7 @@ export class ClawVoice extends HTMLElement {
   private micStream: MediaStream | null = null
   private workletNode: AudioWorkletNode | null = null
   private playbackQueue: Int16Array[] = []
+  private queuedSamples = 0
   private isPlaying = false
   private isRecording = false
   private isHandsFree = true
@@ -466,6 +493,10 @@ export class ClawVoice extends HTMLElement {
   private audioInited = false
   private pendingSample = false
   private processingTimeout: ReturnType<typeof setTimeout> | null = null
+  private intentionalClose = false
+  private reconnectAttempts = 0
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private wakeLock: WakeLockSentinel | null = null
 
   // DOM refs
   private transcriptEl!: HTMLElement
@@ -553,6 +584,7 @@ export class ClawVoice extends HTMLElement {
 
     this.talkBtn.addEventListener('pointerdown', async (e) => {
       e.preventDefault()
+      navigator.vibrate?.(10)
       if (this.isHandsFree) {
         this.isRecording ? this.stopRecording() : await this.startRecording()
       } else {
@@ -561,6 +593,7 @@ export class ClawVoice extends HTMLElement {
     })
     this.talkBtn.addEventListener('pointerup', (e) => {
       e.preventDefault()
+      navigator.vibrate?.(5)
       if (!this.isHandsFree) this.stopRecording()
     })
     this.talkBtn.addEventListener('pointerleave', (e) => {
@@ -618,6 +651,12 @@ export class ClawVoice extends HTMLElement {
     }
     document.addEventListener('keydown', onKeyDown)
     document.addEventListener('keyup', onKeyUp)
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && this.ws?.readyState === WebSocket.OPEN) {
+        this.acquireWakeLock()
+      }
+    })
   }
 
   private updateModeUI(): void {
@@ -702,12 +741,16 @@ export class ClawVoice extends HTMLElement {
     URL.revokeObjectURL(url)
 
     this.workletNode = new AudioWorkletNode(this.audioCtx, 'pcm-capture')
-    let audioMsgCount = 0
-    this.workletNode.port.onmessage = (e: MessageEvent<Float32Array>) => {
+    this.workletNode.port.onmessage = (e: MessageEvent<{ audio: Float32Array; rms: number }>) => {
+      const { audio, rms } = e.data
+      // Drive mic level visualization
+      if (this.isRecording) {
+        const level = Math.min(rms * 5, 1)
+        this.talkBtn.style.setProperty('--mic-level', String(level))
+      }
       if (!this.isRecording || !this.ws || this.ws.readyState !== WebSocket.OPEN) return
-      if (audioMsgCount++ < 3) console.log('[claw-voice] sending audio frame', audioMsgCount, 'wsState:', this.ws.readyState)
       const targetRate = this.currentProvider === 'gemini' ? SAMPLE_RATE_GEMINI_IN : SAMPLE_RATE_OPENAI
-      const resampled = resample(e.data, this.audioCtx!.sampleRate, targetRate)
+      const resampled = resample(audio, this.audioCtx!.sampleRate, targetRate)
       const b64 = float32ToPcm16B64(resampled)
       this.ws.send(JSON.stringify({ type: 'audio', data: b64 }))
     }
@@ -717,31 +760,49 @@ export class ClawVoice extends HTMLElement {
   }
 
   private connectWs(): void {
+    this.intentionalClose = true
+    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null }
     if (this.ws) this.ws.close()
+    this.intentionalClose = false
+    this.reconnectAttempts = 0
+    this.setStatus('', 'Connecting...')
+    this.openWs()
+  }
 
+  private tryReconnect(): void {
+    const MAX_ATTEMPTS = 5
+    if (this.reconnectAttempts >= MAX_ATTEMPTS) {
+      this.setStatus('', 'Disconnected')
+      this.emit('voice-disconnected', {})
+      this.addMessage('Connection lost. Tap mic to reconnect.', 'system')
+      return
+    }
+    this.reconnectAttempts++
+    const delay = Math.min(1000 * 2 ** (this.reconnectAttempts - 1), 16000) + Math.random() * 1000
+    this.setStatus('', `Reconnecting (${this.reconnectAttempts}/${MAX_ATTEMPTS})...`)
+    this.reconnectTimer = setTimeout(() => {
+      this.openWs()
+    }, delay)
+  }
+
+  private openWs(): void {
     const voiceParam = this.currentVoice ? `&voice=${encodeURIComponent(this.currentVoice)}` : ''
     const sampleParam = this.pendingSample ? '&sample=true' : ''
     this.pendingSample = false
-    const url = `${this.wsUrl}?provider=${this.currentProvider}&vad=${this.isHandsFree}${voiceParam}${sampleParam}`
-    this.setStatus('', 'Connecting...')
+    const tokenParam = this.getAttribute('token') ? `&token=${encodeURIComponent(this.getAttribute('token')!)}` : ''
+    const url = `${this.wsUrl}?provider=${this.currentProvider}&vad=${this.isHandsFree}${voiceParam}${sampleParam}${tokenParam}`
 
     this.ws = new WebSocket(url)
-
     this.ws.onopen = () => this.setStatus('', 'Authenticating...')
-
     this.ws.onmessage = async (e) => {
       const msg = JSON.parse(e.data)
-      console.log('[claw-voice] WS msg:', msg.type, msg.type === 'audio' ? `(${msg.data?.length} chars)` : '')
       switch (msg.type) {
         case 'connected':
-          console.log('[claw-voice] WS connected, provider:', msg.provider, 'isHandsFree:', this.isHandsFree)
+          this.reconnectAttempts = 0
           this.setStatus('connected', `Connected — ${msg.provider}`)
           this.emit('voice-connected', { provider: msg.provider })
-          if (this.isHandsFree) {
-            console.log('[claw-voice] auto-starting recording for hands-free')
-            await this.startRecording()
-            console.log('[claw-voice] after startRecording, isRecording:', this.isRecording)
-          }
+          this.acquireWakeLock()
+          if (this.isHandsFree) await this.startRecording()
           break
         case 'audio':
           this.queueAudio(msg.data)
@@ -762,13 +823,17 @@ export class ClawVoice extends HTMLElement {
           break
       }
     }
-
     this.ws.onclose = () => {
-      this.setStatus('', 'Disconnected')
-      this.emit('voice-disconnected', {})
+      if (this.intentionalClose) {
+        this.setStatus('', 'Disconnected')
+        this.emit('voice-disconnected', {})
+        return
+      }
+      this.tryReconnect()
     }
-
-    this.ws.onerror = () => this.setStatus('', 'Connection error')
+    this.ws.onerror = () => {
+      if (!this.intentionalClose) this.setStatus('', 'Connection error')
+    }
   }
 
   private queueAudio(b64data: string): void {
@@ -778,7 +843,17 @@ export class ClawVoice extends HTMLElement {
     const view = new DataView(new ArrayBuffer(bytes.length))
     for (let i = 0; i < bytes.length; i++) view.setUint8(i, bytes.charCodeAt(i))
     for (let i = 0; i < buf.length; i++) buf[i] = view.getInt16(i * 2, true)
+
+    // Cap queue at ~5s of audio (at playback sample rate)
+    const rate = this.currentProvider === 'gemini' ? SAMPLE_RATE_GEMINI_OUT : SAMPLE_RATE_OPENAI
+    const maxSamples = rate * 5
     this.playbackQueue.push(buf)
+    this.queuedSamples += buf.length
+    while (this.queuedSamples > maxSamples && this.playbackQueue.length > 1) {
+      const dropped = this.playbackQueue.shift()!
+      this.queuedSamples -= dropped.length
+    }
+
     if (!this.isPlaying) this.playNext()
   }
 
@@ -796,6 +871,7 @@ export class ClawVoice extends HTMLElement {
     this.setStatus('speaking', 'Speaking...')
 
     const samples = this.playbackQueue.shift()!
+    this.queuedSamples -= samples.length
     const rate = this.currentProvider === 'gemini' ? SAMPLE_RATE_GEMINI_OUT : SAMPLE_RATE_OPENAI
     const audioBuf = this.audioCtx.createBuffer(1, samples.length, rate)
     const channel = audioBuf.getChannelData(0)
@@ -862,8 +938,8 @@ export class ClawVoice extends HTMLElement {
     }
 
     this.isRecording = true
-    console.log('[claw-voice] recording started, workletNode:', !!this.workletNode, 'ws:', this.ws?.readyState)
     this.playbackQueue = []
+    this.queuedSamples = 0
     this.isSpeaking = false
     this.isPlaying = false
     this.talkBtn.classList.add('active')
@@ -876,6 +952,7 @@ export class ClawVoice extends HTMLElement {
     if (!this.isRecording) return
     this.isRecording = false
     this.talkBtn.classList.remove('active')
+    this.talkBtn.style.setProperty('--mic-level', '0')
     this.setMicIcon(false)
     this.setStatus('connected', 'Processing...')
 
@@ -901,6 +978,19 @@ export class ClawVoice extends HTMLElement {
       clearTimeout(this.processingTimeout)
       this.processingTimeout = null
     }
+  }
+
+  private async acquireWakeLock(): Promise<void> {
+    if (this.wakeLock || !('wakeLock' in navigator)) return
+    try {
+      this.wakeLock = await navigator.wakeLock.request('screen')
+      this.wakeLock.addEventListener('release', () => { this.wakeLock = null })
+    } catch { /* wake lock not available or denied */ }
+  }
+
+  private releaseWakeLock(): void {
+    this.wakeLock?.release()
+    this.wakeLock = null
   }
 
   private emit(name: string, detail: Record<string, unknown>): void {
@@ -960,6 +1050,9 @@ export class ClawVoice extends HTMLElement {
 
   private cleanup(): void {
     this.clearProcessingTimeout()
+    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null }
+    this.intentionalClose = true
+    this.releaseWakeLock()
     if (this.ws) { this.ws.close(); this.ws = null }
     if (this.micStream) { this.micStream.getTracks().forEach(t => t.stop()); this.micStream = null }
     if (this.audioCtx) { this.audioCtx.close(); this.audioCtx = null }

@@ -18,7 +18,9 @@ async function main(): Promise<void> {
   const app = Fastify({ logger: true })
 
   await app.register(fastifyCors, { origin: true })
-  await app.register(fastifyWebsocket)
+  await app.register(fastifyWebsocket, {
+    options: { maxPayload: 1 * 1024 * 1024 },
+  })
 
   // Serve widget bundle from dist/
   const distDir = join(__dirname, '..', 'dist')

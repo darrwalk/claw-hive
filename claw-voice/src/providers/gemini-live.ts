@@ -1,6 +1,7 @@
 import WebSocket from 'ws'
 import type { ProviderConfig } from '../config.js'
 import type { ProviderEvent, ToolDef, VoiceProvider } from './base.js'
+import { iterateWsMessages } from './ws-iter.js'
 
 function openaiToolsToGemini(tools: ToolDef[]): Record<string, unknown>[] {
   return tools
@@ -30,10 +31,15 @@ export class GeminiLiveProvider implements VoiceProvider {
     const url = `${this.config.url}?key=${this.config.apiKey}`
     this.ws = new WebSocket(url)
 
-    await new Promise<void>((resolve, reject) => {
-      this.ws!.once('open', resolve)
-      this.ws!.once('error', reject)
-    })
+    await Promise.race([
+      new Promise<void>((resolve, reject) => {
+        this.ws!.once('open', resolve)
+        this.ws!.once('error', reject)
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Gemini WebSocket open timed out (10s)')), 10_000),
+      ),
+    ])
 
     const setup: Record<string, unknown> = {
       model: `models/${this.config.model}`,
@@ -57,17 +63,22 @@ export class GeminiLiveProvider implements VoiceProvider {
 
     this.ws.send(JSON.stringify({ setup }))
 
-    await new Promise<void>((resolve, reject) => {
-      this.ws!.once('message', (raw) => {
-        const msg = JSON.parse(raw.toString())
-        if ('setupComplete' in msg) {
-          resolve()
-        } else {
-          reject(new Error(`Unexpected first message: ${JSON.stringify(Object.keys(msg))}`))
-        }
-      })
-      this.ws!.once('error', reject)
-    })
+    await Promise.race([
+      new Promise<void>((resolve, reject) => {
+        this.ws!.once('message', (raw) => {
+          const msg = JSON.parse(raw.toString())
+          if ('setupComplete' in msg) {
+            resolve()
+          } else {
+            reject(new Error(`Unexpected first message: ${JSON.stringify(Object.keys(msg))}`))
+          }
+        })
+        this.ws!.once('error', reject)
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Gemini setup handshake timed out (10s)')), 10_000),
+      ),
+    ])
   }
 
   async sendText(text: string): Promise<void> {
@@ -107,7 +118,7 @@ export class GeminiLiveProvider implements VoiceProvider {
   async *receive(): AsyncGenerator<ProviderEvent> {
     if (!this.ws) return
 
-    for await (const raw of this.iterateMessages()) {
+    for await (const raw of iterateWsMessages(this.ws)) {
       const msg = JSON.parse(raw)
 
       if ('serverContent' in msg) {
@@ -153,40 +164,4 @@ export class GeminiLiveProvider implements VoiceProvider {
     }
   }
 
-  private async *iterateMessages(): AsyncGenerator<string> {
-    const ws = this.ws!
-    const queue: string[] = []
-    let resolve: (() => void) | null = null
-    let done = false
-
-    const onMessage = (data: WebSocket.Data) => {
-      queue.push(data.toString())
-      resolve?.()
-    }
-    const onClose = () => {
-      done = true
-      resolve?.()
-    }
-    const onError = () => {
-      done = true
-      resolve?.()
-    }
-
-    ws.on('message', onMessage)
-    ws.on('close', onClose)
-    ws.on('error', onError)
-
-    try {
-      while (true) {
-        while (queue.length > 0) yield queue.shift()!
-        if (done) return
-        await new Promise<void>((r) => { resolve = r })
-        resolve = null
-      }
-    } finally {
-      ws.off('message', onMessage)
-      ws.off('close', onClose)
-      ws.off('error', onError)
-    }
-  }
 }
