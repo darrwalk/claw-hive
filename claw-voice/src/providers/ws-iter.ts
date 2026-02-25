@@ -1,11 +1,14 @@
 import type WebSocket from 'ws'
 
+const MAX_QUEUE = 500
+
 export async function* iterateWsMessages(ws: WebSocket): AsyncGenerator<string> {
   const queue: string[] = []
   let resolve: (() => void) | null = null
   let done = false
 
   const onMessage = (data: WebSocket.Data) => {
+    if (queue.length >= MAX_QUEUE) queue.shift()
     queue.push(data.toString())
     resolve?.()
   }

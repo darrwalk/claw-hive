@@ -44,6 +44,11 @@ export async function handleVoiceSocket(
   let voiceProvider: VoiceProvider | null = null
   let reconnectCount = 0
 
+  // Keepalive: ping browser WS every 30s
+  const pingInterval = setInterval(() => {
+    if (ws.readyState === ws.OPEN) ws.ping()
+  }, 30_000)
+
   async function connectProvider(): Promise<VoiceProvider> {
     const provider = createProvider(providerName, voice)
     const instructions = await assembleInstructions()
@@ -155,6 +160,8 @@ export async function handleVoiceSocket(
           console.log('[voice] Audio commit from browser')
           await voiceProvider?.commitAudio()
           break
+        case 'ping':
+          break
         case 'close':
           ws.close()
           break
@@ -166,6 +173,7 @@ export async function handleVoiceSocket(
 
   // Clean up on browser disconnect
   ws.on('close', async () => {
+    clearInterval(pingInterval)
     activeSessions--
     console.log('[voice] Browser disconnected')
     await voiceProvider?.close()

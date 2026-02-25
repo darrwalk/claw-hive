@@ -17,17 +17,24 @@ const HOST = process.env.HOSTNAME || '0.0.0.0'
 async function main(): Promise<void> {
   const app = Fastify({ logger: true })
 
-  await app.register(fastifyCors, { origin: true })
+  const CORS_ORIGIN = process.env.CORS_ORIGIN
+  await app.register(fastifyCors, {
+    origin: CORS_ORIGIN ? CORS_ORIGIN.split(',') : true,
+  })
   await app.register(fastifyWebsocket, {
     options: { maxPayload: 1 * 1024 * 1024 },
   })
 
-  // Serve widget bundle from dist/
+  // Serve widget bundle from dist/ with no-cache for freshness after deploys
   const distDir = join(__dirname, '..', 'dist')
   await app.register(fastifyStatic, {
     root: distDir,
     prefix: '/dist/',
     decorateReply: false,
+    cacheControl: false,
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'no-cache')
+    },
   })
 
   // Serve standalone UI from static/

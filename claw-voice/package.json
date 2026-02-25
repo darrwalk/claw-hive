@@ -7,13 +7,14 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc && tsx widget/build.ts",
     "start": "node dist/server.js",
-    "build:widget": "tsx widget/build.ts"
+    "build:widget": "tsx widget/build.ts",
+    "test": "vitest run"
   },
   "dependencies": {
-    "fastify": "^5.7.0",
-    "@fastify/websocket": "^11.2.0",
-    "@fastify/static": "^9.0.0",
     "@fastify/cors": "^11.2.0",
+    "@fastify/static": "^9.0.0",
+    "@fastify/websocket": "^11.2.0",
+    "fastify": "^5.7.0",
     "ws": "^8.19.0"
   },
   "devDependencies": {
@@ -21,6 +22,7 @@
     "@types/ws": "^8.18.1",
     "esbuild": "^0.25.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.4"
   }
 }

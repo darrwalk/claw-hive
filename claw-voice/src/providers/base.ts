@@ -46,4 +46,5 @@ export interface VoiceProvider {
   receive(): AsyncGenerator<ProviderEvent>
   sendToolResult(callId: string, result: string): Promise<void>
   close(): Promise<void>
+  readonly pttBuffering?: boolean
 }

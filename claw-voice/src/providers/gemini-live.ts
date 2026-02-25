@@ -13,21 +13,20 @@ function openaiToolsToGemini(tools: ToolDef[]): Record<string, unknown>[] {
     }))
 }
 
-function generateSilenceB64(): string {
-  const nSamples = 1600
-  const buf = Buffer.alloc(nSamples * 2)
-  return buf.toString('base64')
-}
-
 export class GeminiLiveProvider implements VoiceProvider {
   private ws: WebSocket | null = null
   private config: ProviderConfig
+  private vad = false
+  private audioBuffer: string[] = []
+
+  get pttBuffering(): boolean { return !this.vad }
 
   constructor(config: ProviderConfig) {
     this.config = config
   }
 
-  async connect(instructions: string, tools: ToolDef[], _vad = false): Promise<void> {
+  async connect(instructions: string, tools: ToolDef[], vad = false): Promise<void> {
+    this.vad = vad
     const url = `${this.config.url}?key=${this.config.apiKey}`
     this.ws = new WebSocket(url)
 
@@ -91,6 +90,12 @@ export class GeminiLiveProvider implements VoiceProvider {
   }
 
   async sendAudio(audioB64: string): Promise<void> {
+    if (!this.vad) {
+      // PTT mode: buffer audio for batch send on commit
+      this.audioBuffer.push(audioB64)
+      return
+    }
+    // VAD/hands-free mode: stream in real-time
     this.ws?.send(
       JSON.stringify({
         realtime_input: {
@@ -101,18 +106,26 @@ export class GeminiLiveProvider implements VoiceProvider {
   }
 
   async commitAudio(): Promise<void> {
-    const silence = generateSilenceB64()
-    for (let i = 0; i < 5; i++) {
-      if (!this.ws) return
-      this.ws.send(
-        JSON.stringify({
-          realtime_input: {
-            audio: { data: silence, mimeType: 'audio/pcm;rate=16000' },
-          },
-        }),
-      )
-      await new Promise((r) => setTimeout(r, 100))
+    if (!this.ws) return
+
+    if (!this.vad && this.audioBuffer.length > 0) {
+      // PTT mode: concatenate buffered audio and send as client_content turn
+      const combined = this.audioBuffer.join('')
+      this.audioBuffer = []
+      this.ws.send(JSON.stringify({
+        client_content: {
+          turns: [{
+            role: 'user',
+            parts: [{ inline_data: { mime_type: 'audio/pcm;rate=16000', data: combined } }],
+          }],
+          turn_complete: true,
+        },
+      }))
+      return
     }
+
+    // VAD mode: silence padding fallback (shouldn't normally be called)
+    this.audioBuffer = []
   }
 
   async *receive(): AsyncGenerator<ProviderEvent> {
@@ -158,6 +171,7 @@ export class GeminiLiveProvider implements VoiceProvider {
   }
 
   async close(): Promise<void> {
+    this.audioBuffer = []
     if (this.ws) {
       this.ws.close()
       this.ws = null
