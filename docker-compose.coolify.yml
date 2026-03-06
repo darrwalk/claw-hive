@@ -1,0 +1,73 @@
+services:
+  claw-hive-dashboard:
+    build: ./dashboard
+    container_name: hive-claw-hive-dashboard-1
+    ports:
+      - "100.99.29.88:4100:3000"
+    networks:
+      - default
+      - openclaw_default
+    volumes:
+      - ${HIVE_DATA_DIR}:/app/data/hive:rw
+      - ./cli:/app/cli:ro
+    environment:
+      - HIVE_DATA_PATH=/app/data/hive
+      - WORKSPACE_PATH=/app/workspace
+      - HOSTNAME=0.0.0.0
+      - GATEWAY_URL=${GATEWAY_URL:-http://openclaw-gateway-1:18789}
+      - GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  claw-voice:
+    build: ./claw-voice
+    container_name: hive-claw-voice-1
+    ports:
+      - "100.99.29.88:4200:8200"
+    networks:
+      - default
+      - openclaw_default
+    volumes:
+      - ${WORKSPACE_DIR}:/app/workspace:rw
+    environment:
+      - WORKSPACE_PATH=/app/workspace
+      - HOSTNAME=0.0.0.0
+      - PORT=8200
+      - XAI_API_KEY=${XAI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GATEWAY_URL=${GATEWAY_URL:-http://openclaw-gateway-1:18789}
+      - GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8200/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  poll-relay:
+    build:
+      context: .
+      dockerfile: poll-relay/Dockerfile
+    container_name: hive-poll-relay-1
+    volumes:
+      - ${HIVE_DATA_DIR}:/hive-data:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID}"
+    environment:
+      HIVE_DATA_DIR: /hive-data
+      HIVE_CLI: /app/cli/hive-cli.js
+      BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      CHAT_ID: ${TELEGRAM_CHAT_ID}
+      THREAD_ID: ${TELEGRAM_THREAD_ID}
+      GATEWAY_CONTAINER: ${GATEWAY_CONTAINER:-openclaw-gateway-1}
+    restart: unless-stopped
+
+networks:
+  openclaw_default:
+    external: true
