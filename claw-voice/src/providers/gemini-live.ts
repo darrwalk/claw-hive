@@ -158,12 +158,12 @@ export class GeminiLiveProvider implements VoiceProvider {
     }
   }
 
-  async sendToolResult(callId: string, result: string): Promise<void> {
+  async sendToolResult(callId: string, name: string, result: string): Promise<void> {
     this.ws?.send(
       JSON.stringify({
         tool_response: {
           functionResponses: [
-            { id: callId, name: '', response: { result } },
+            { id: callId, name, response: { result } },
           ],
         },
       }),

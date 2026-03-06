@@ -144,7 +144,7 @@ export class OpenAIRealtimeProvider implements VoiceProvider {
     }
   }
 
-  async sendToolResult(callId: string, result: string): Promise<void> {
+  async sendToolResult(callId: string, _name: string, result: string): Promise<void> {
     if (!this.ws) return
     this.ws.send(
       JSON.stringify({

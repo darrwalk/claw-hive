@@ -81,7 +81,7 @@ export async function handleVoiceSocket(
           console.log(`[voice] Tool call: ${event.name}(${event.arguments.slice(0, 100)})`)
           ws.send(JSON.stringify({ type: 'tool_call', name: event.name }))
           const result = await toolRegistry.execute(event.name, event.arguments)
-          await provider.sendToolResult(event.callId, result)
+          await provider.sendToolResult(event.callId, event.name, result)
           ws.send(JSON.stringify({ type: 'tool_result', name: event.name, result: result.slice(0, 200) }))
           log.push({ role: 'tool', text: `[${event.name}] ${result.slice(0, 200)}` })
           break
