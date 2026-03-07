@@ -19,7 +19,7 @@ async function main(): Promise<void> {
 
   const CORS_ORIGIN = process.env.CORS_ORIGIN
   await app.register(fastifyCors, {
-    origin: CORS_ORIGIN ? CORS_ORIGIN.split(',') : true,
+    origin: CORS_ORIGIN ? CORS_ORIGIN.split(',') : false,
   })
   await app.register(fastifyWebsocket, {
     options: { maxPayload: 1 * 1024 * 1024 },

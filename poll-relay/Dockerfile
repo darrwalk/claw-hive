@@ -23,4 +23,6 @@ RUN chmod +x hive-poll.sh hive-relay.sh hive-blocked-relay.sh
 # Copy supercronic crontab
 COPY poll-relay/crontab ./crontab
 
+USER node
+
 CMD ["/app/supercronic", "/app/crontab"]

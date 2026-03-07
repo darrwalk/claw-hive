@@ -7,6 +7,10 @@ RUN pip install --no-cache-dir .
 
 COPY . .
 
+RUN useradd -r -m -s /bin/false appuser
+
 EXPOSE 8000
+
+USER appuser
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

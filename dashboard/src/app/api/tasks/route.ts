@@ -18,6 +18,12 @@ export async function POST(req: NextRequest) {
   if (!body.title || !body.description) {
     return NextResponse.json({ error: 'title and description required' }, { status: 400 })
   }
+  if (typeof body.title !== 'string' || body.title.length > 200) {
+    return NextResponse.json({ error: 'title must be a string under 200 chars' }, { status: 400 })
+  }
+  if (typeof body.description !== 'string' || body.description.length > 5000) {
+    return NextResponse.json({ error: 'description must be a string under 5000 chars' }, { status: 400 })
+  }
   const task = await createTask(body)
   return NextResponse.json(task, { status: 201 })
 }
