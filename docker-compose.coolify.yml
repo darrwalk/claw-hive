@@ -17,6 +17,7 @@ services:
       - HOSTNAME=0.0.0.0
       - GATEWAY_URL=${GATEWAY_URL:-http://openclaw-gateway-1:18789}
       - GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
+      - WS_TOKEN=${WS_TOKEN}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]

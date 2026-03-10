@@ -11,7 +11,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen">
-        <LayoutShell>{children}</LayoutShell>
+        <LayoutShell wsToken={process.env.WS_TOKEN || ''}>{children}</LayoutShell>
       </body>
     </html>
   )

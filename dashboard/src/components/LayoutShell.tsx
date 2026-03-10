@@ -5,7 +5,7 @@ import Sidebar from '@/components/Sidebar'
 import AppShell from '@/components/AppShell'
 import VoiceWidget from '@/components/VoiceWidget'
 
-export default function LayoutShell({ children }: { children: React.ReactNode }) {
+export default function LayoutShell({ children, wsToken }: { children: React.ReactNode; wsToken: string }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
@@ -16,7 +16,7 @@ export default function LayoutShell({ children }: { children: React.ReactNode })
           {children}
         </AppShell>
       </div>
-      <VoiceWidget />
+      <VoiceWidget wsToken={wsToken} />
     </>
   )
 }

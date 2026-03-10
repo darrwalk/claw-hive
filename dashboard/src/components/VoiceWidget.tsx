@@ -7,6 +7,7 @@ declare global {
     interface IntrinsicElements {
       'claw-voice': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
         'ws-url'?: string
+        token?: string
         provider?: string
         theme?: string
         mode?: string
@@ -30,7 +31,7 @@ function getVoiceUrl(): string {
 
 interface Position { x: number; y: number }
 
-export default function VoiceWidget() {
+export default function VoiceWidget({ wsToken }: { wsToken: string }) {
   const loaded = useRef(false)
   const [ready, setReady] = useState(false)
   const [voiceUrl, setVoiceUrl] = useState('')
@@ -131,6 +132,7 @@ export default function VoiceWidget() {
       <claw-voice
         ref={voiceRef}
         ws-url={wsUrl}
+        token={wsToken}
         theme="dark"
         style={{ height: collapsed ? undefined : 'calc(100% - 14px)' }}
       />
