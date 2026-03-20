@@ -1,0 +1,16 @@
+name: Deploy to Coolify
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Coolify deploy
+        env:
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+        run: |
+          curl -sf -X POST \
+            "https://coolify.forge.dexmind.ai/api/v1/deploy?uuid=tsokgskkswss0s4ogogk8soo" \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            -H "Accept: application/json"
