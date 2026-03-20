@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, KanbanSquare, Activity, FolderKanban, FolderOpen, HeartPulse, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import pkg from '../../package.json'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
@@ -58,7 +59,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         })}
       </nav>
       <div className="p-3 border-t">
-        <div className="text-xs text-muted-foreground font-mono">v0.2.0</div>
+        <div className="text-xs text-muted-foreground font-mono">v{pkg.version}</div>
       </div>
     </aside>
   )
