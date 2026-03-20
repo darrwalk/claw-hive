@@ -49,10 +49,6 @@ export class GeminiLiveProvider implements VoiceProvider {
             prebuiltVoiceConfig: { voiceName: this.config.voice },
           },
         },
-        outputAudioEncoding: 'LINEAR16',
-        sampleRateHertz: 24000,
-        inputAudioTranscription: {},
-        outputAudioTranscription: {},
       },
       systemInstruction: { parts: [{ text: instructions }] },
     }
