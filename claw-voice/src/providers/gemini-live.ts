@@ -49,6 +49,10 @@ export class GeminiLiveProvider implements VoiceProvider {
             prebuiltVoiceConfig: { voiceName: this.config.voice },
           },
         },
+        outputAudioEncoding: 'LINEAR16',
+        sampleRateHertz: 24000,
+        inputAudioTranscription: {},
+        outputAudioTranscription: {},
       },
       systemInstruction: { parts: [{ text: instructions }] },
     }
@@ -140,7 +144,17 @@ export class GeminiLiveProvider implements VoiceProvider {
         for (const part of parts) {
           if (part.inlineData?.mimeType?.startsWith('audio/')) {
             yield { kind: 'audio', audioB64: part.inlineData.data }
+          } else if (part.text) {
+            yield { kind: 'transcript', text: part.text, role: 'assistant', final: false }
           }
+        }
+        // Output audio transcription (assistant speech → text)
+        if (content.outputTranscription?.text) {
+          yield { kind: 'transcript', text: content.outputTranscription.text, role: 'assistant', final: false }
+        }
+        // Input audio transcription (user speech → text)
+        if (content.inputTranscription?.text) {
+          yield { kind: 'transcript', text: content.inputTranscription.text, role: 'user', final: true }
         }
         if (content.turnComplete) {
           yield { kind: 'transcript', text: '', role: 'assistant', final: true }
