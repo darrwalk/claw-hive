@@ -36,8 +36,9 @@ function float32ToPcm16B64(float32: Float32Array): string {
   const buf = new ArrayBuffer(float32.length * 2)
   const view = new DataView(buf)
   for (let i = 0; i < float32.length; i++) {
+    // Clamp and scale symmetrically — same 32768 divisor used on decode
     const s = Math.max(-1, Math.min(1, float32[i]))
-    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true)
+    view.setInt16(i * 2, (s * 32768) | 0, true)
   }
   const bytes = new Uint8Array(buf)
   let binary = ''
@@ -897,23 +898,15 @@ export class ClawVoice extends HTMLElement {
 
   private queueAudio(b64data: string): void {
     this.clearProcessingTimeout()
-    const bytes = atob(b64data)
-    const buf = new Int16Array(bytes.length / 2)
-    const view = new DataView(new ArrayBuffer(bytes.length))
-    for (let i = 0; i < bytes.length; i++) view.setUint8(i, bytes.charCodeAt(i))
-    for (let i = 0; i < buf.length; i++) buf[i] = view.getInt16(i * 2, true)
+    // Decode base64 → Uint8Array → Int16Array (shared buffer, no copy)
+    const raw = atob(b64data)
+    const bytes = new Uint8Array(raw.length)
+    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i)
+    const buf = new Int16Array(bytes.buffer, 0, bytes.length >> 1)
 
-    // Cap queue at ~15s of audio (at playback sample rate)
-    const rate = this.currentProvider === 'gemini' ? SAMPLE_RATE_GEMINI_OUT : SAMPLE_RATE_OPENAI
-    const maxSamples = rate * 15
     this.playbackQueue.push(buf)
     this.queuedSamples += buf.length
-    while (this.queuedSamples > maxSamples && this.playbackQueue.length > 1) {
-      const dropped = this.playbackQueue.shift()!
-      this.queuedSamples -= dropped.length
-    }
-
-    if (!this.isPlaying) this.playNext()
+    this.drainQueue()
   }
 
   private ensurePlaybackGain(): GainNode {
@@ -924,49 +917,69 @@ export class ClawVoice extends HTMLElement {
     return this.playbackGain!
   }
 
-  private playNext(): void {
-    if (this.playbackQueue.length === 0 || !this.audioCtx) {
-      this.isPlaying = false
-      this.isSpeaking = false
-      this.activeSource = null
-      this.nextPlayTime = 0
-      this.talkBtn.classList.remove('speaking')
-      this.setStatus('connected', 'Connected')
-      return
-    }
+  private draining = false
+
+  /** Schedule all queued audio chunks gaplessly. Safe to call from anywhere — re-entrant guard prevents double chains. */
+  private drainQueue(): void {
+    if (this.draining || !this.audioCtx || this.playbackQueue.length === 0) return
+    this.draining = true
     this.isPlaying = true
     this.isSpeaking = true
     this.talkBtn.classList.add('speaking')
     this.setStatus('speaking', 'Speaking...')
 
-    const samples = this.playbackQueue.shift()!
-    this.queuedSamples -= samples.length
-    const rate = this.currentProvider === 'gemini' ? SAMPLE_RATE_GEMINI_OUT : SAMPLE_RATE_OPENAI
-    const audioBuf = this.audioCtx.createBuffer(1, samples.length, rate)
-    const channel = audioBuf.getChannelData(0)
-    for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768
-
-    const gain = this.ensurePlaybackGain()
-    const source = this.audioCtx.createBufferSource()
-    source.buffer = audioBuf
-    source.connect(gain)
-
-    // Gapless scheduling: start at end of previous buffer, not "now"
-    const now = this.audioCtx.currentTime
-    const startAt = this.nextPlayTime > now ? this.nextPlayTime : now
-    this.nextPlayTime = startAt + audioBuf.duration
-
     const gen = this.playbackGen
-    source.onended = () => {
-      if (this.playbackGen !== gen) return   // barged in
-      this.playNext()
+    const rate = this.currentProvider === 'gemini' ? SAMPLE_RATE_GEMINI_OUT : SAMPLE_RATE_OPENAI
+    const gain = this.ensurePlaybackGain()
+
+    // Schedule every queued chunk back-to-back
+    while (this.playbackQueue.length > 0) {
+      // Cap at ~15s ahead of current time to bound memory
+      const now = this.audioCtx.currentTime
+      if (this.nextPlayTime > now + 15) break
+
+      const samples = this.playbackQueue.shift()!
+      this.queuedSamples -= samples.length
+
+      const audioBuf = this.audioCtx.createBuffer(1, samples.length, rate)
+      const channel = audioBuf.getChannelData(0)
+      for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768
+
+      const source = this.audioCtx.createBufferSource()
+      source.buffer = audioBuf
+      source.connect(gain)
+
+      const startAt = this.nextPlayTime > now ? this.nextPlayTime : now
+      this.nextPlayTime = startAt + audioBuf.duration
+      source.start(startAt)
+      this.activeSource = source
     }
-    source.start(startAt)
-    this.activeSource = source
+
+    // Set up a single end-sentinel to check for more data or stop
+    const sentinel = this.activeSource
+    if (sentinel) {
+      sentinel.onended = () => {
+        if (this.playbackGen !== gen) return
+        this.draining = false
+        if (this.playbackQueue.length > 0) {
+          this.drainQueue()
+        } else {
+          this.isPlaying = false
+          this.isSpeaking = false
+          this.activeSource = null
+          this.nextPlayTime = 0
+          this.talkBtn.classList.remove('speaking')
+          this.setStatus('connected', 'Connected')
+        }
+      }
+    } else {
+      this.draining = false
+    }
   }
 
   private bargeIn(): void {
     this.playbackGen++
+    this.draining = false
     if (!this.audioCtx || !this.isPlaying) return
     // Smooth fade-out instead of hard cut
     if (this.playbackGain) {
