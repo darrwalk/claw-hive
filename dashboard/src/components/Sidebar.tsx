@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, KanbanSquare, Activity, FolderKanban, FolderOpen, X } from 'lucide-react'
+import { LayoutDashboard, KanbanSquare, Activity, FolderKanban, FolderOpen, HeartPulse, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/projects', label: 'Projects', icon: FolderKanban },
   { href: '/workspace', label: 'Workspace', icon: FolderOpen },
+  { href: '/health', label: 'Health', icon: HeartPulse },
 ]
 
 interface SidebarProps {

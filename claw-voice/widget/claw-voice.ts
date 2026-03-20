@@ -494,6 +494,7 @@ export class ClawVoice extends HTMLElement {
   private playbackGain: GainNode | null = null
   private activeSource: AudioBufferSourceNode | null = null
   private playbackGen = 0
+  private playSeq = 0
   private partialAssistant = ''
   private currentProvider = 'gemini'
   private currentVoice = ''
@@ -949,8 +950,13 @@ export class ClawVoice extends HTMLElement {
     source.buffer = audioBuf
     source.connect(gain)
 
+    const seq = ++this.playSeq
     const gen = this.playbackGen
-    source.onended = () => { if (this.playbackGen === gen) this.playNext() }
+    source.onended = () => {
+      if (this.playbackGen !== gen) return   // barged in
+      if (this.playSeq !== seq) return       // stale callback
+      this.playNext()
+    }
     source.start()
     this.activeSource = source
   }
