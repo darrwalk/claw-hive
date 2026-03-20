@@ -19,7 +19,7 @@ const PROVIDER_DEFS: Record<string, ProviderDef> = {
   gemini: {
     url: 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent',
     keyEnv: 'GOOGLE_API_KEY',
-    model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+    model: 'gemini-2.5-flash-preview-native-audio-dialog',
     voice: 'Kore',
     voices: ['Kore', 'Puck', 'Charon', 'Zephyr', 'Fenrir', 'Aoede'],
     protocol: 'gemini',
