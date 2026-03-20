@@ -61,7 +61,7 @@ export async function handleVoiceSocket(
       if (ws.readyState !== ws.OPEN) return 'done'
       switch (event.kind) {
         case 'audio':
-          if (ws.bufferedAmount < 256 * 1024) {
+          if (ws.bufferedAmount < 1024 * 1024) {
             ws.send(JSON.stringify({ type: 'audio', data: event.audioB64 }))
           }
           break

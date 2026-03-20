@@ -903,9 +903,9 @@ export class ClawVoice extends HTMLElement {
     for (let i = 0; i < bytes.length; i++) view.setUint8(i, bytes.charCodeAt(i))
     for (let i = 0; i < buf.length; i++) buf[i] = view.getInt16(i * 2, true)
 
-    // Cap queue at ~5s of audio (at playback sample rate)
+    // Cap queue at ~15s of audio (at playback sample rate)
     const rate = this.currentProvider === 'gemini' ? SAMPLE_RATE_GEMINI_OUT : SAMPLE_RATE_OPENAI
-    const maxSamples = rate * 5
+    const maxSamples = rate * 15
     this.playbackQueue.push(buf)
     this.queuedSamples += buf.length
     while (this.queuedSamples > maxSamples && this.playbackQueue.length > 1) {
@@ -929,6 +929,7 @@ export class ClawVoice extends HTMLElement {
       this.isPlaying = false
       this.isSpeaking = false
       this.activeSource = null
+      this.nextPlayTime = 0
       this.talkBtn.classList.remove('speaking')
       this.setStatus('connected', 'Connected')
       return
@@ -950,14 +951,17 @@ export class ClawVoice extends HTMLElement {
     source.buffer = audioBuf
     source.connect(gain)
 
-    const seq = ++this.playSeq
+    // Gapless scheduling: start at end of previous buffer, not "now"
+    const now = this.audioCtx.currentTime
+    const startAt = this.nextPlayTime > now ? this.nextPlayTime : now
+    this.nextPlayTime = startAt + audioBuf.duration
+
     const gen = this.playbackGen
     source.onended = () => {
       if (this.playbackGen !== gen) return   // barged in
-      if (this.playSeq !== seq) return       // stale callback
       this.playNext()
     }
-    source.start()
+    source.start(startAt)
     this.activeSource = source
   }
 
