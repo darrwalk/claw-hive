@@ -2,6 +2,8 @@
 // Attributes: ws-url, provider, theme (dark|light), mode (push-to-talk|hands-free)
 // Events: voice-connected, voice-transcript, voice-error, voice-disconnected
 
+declare const __VERSION__: string
+
 const SAMPLE_RATE_OPENAI = 24000
 const SAMPLE_RATE_GEMINI_IN = 16000
 const SAMPLE_RATE_GEMINI_OUT = 24000
@@ -172,6 +174,12 @@ header h1 { font-size: 18px; font-weight: 600; }
 .status-dot.connected { background: var(--green); }
 .status-dot.recording { background: var(--red); animation: pulse 1s infinite; }
 .status-dot.speaking { background: var(--accent); animation: pulse 0.8s infinite; }
+.version {
+  font-size: 10px;
+  color: var(--text-dim);
+  opacity: 0.5;
+  font-family: monospace;
+}
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.5; transform: scale(1.3); }
@@ -413,7 +421,10 @@ function buildDOM(shadow: ShadowRoot): Record<string, HTMLElement> {
   statusText.id = 'statusText'
   statusText.textContent = 'Disconnected'
   statusDiv.append(statusDot, statusText)
-  headerLeft.append(h1, statusDiv)
+  const versionSpan = document.createElement('span')
+  versionSpan.className = 'version'
+  versionSpan.textContent = `v${__VERSION__}`
+  headerLeft.append(h1, statusDiv, versionSpan)
   const providerSelect = document.createElement('select')
   providerSelect.className = 'provider-select'
   providerSelect.id = 'providerSelect'
