@@ -37,12 +37,26 @@ async function main(): Promise<void> {
     },
   })
 
-  // Serve standalone UI from static/
-  const staticDir = join(__dirname, '..', 'static')
-  await app.register(fastifyStatic, {
-    root: staticDir,
-    prefix: '/',
-    decorateReply: false,
+  // Serve standalone UI with WS_TOKEN injected (Tailscale-only page)
+  app.get('/', async (_request, reply) => {
+    const token = process.env.WS_TOKEN || ''
+    reply.type('text/html').send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Claudia Voice</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: #0a0a10; }
+  claw-voice { display: block; width: 100%; max-width: 420px; height: 100dvh; margin: 0 auto; }
+</style>
+</head>
+<body>
+<claw-voice theme="dark" token="${token}"></claw-voice>
+<script src="/dist/claw-voice.js"></script>
+</body>
+</html>`)
   })
 
   const toolRegistry = await createToolRegistry(WORKSPACE_DIR)
